@@ -1,4 +1,3 @@
-pinn-rocket-trajectory/
 ├── README.md
 ├── LICENSE
 ├── pyproject.toml

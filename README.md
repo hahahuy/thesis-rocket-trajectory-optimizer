@@ -6,7 +6,7 @@ This repository contains the implementation of physics-informed neural networks 
 
 - `src/physics/` - Deterministic physics & dynamics models
 - `src/solver/` - Baseline optimal control solvers
-- `src/models/` - PINN and hybrid neural network models
+- `src/models/` - PINN and hybrid neural network models`
 - `src/train/` - Training scripts and utilities
 - `src/optim/` - Optimization pipeline using surrogate models
 - `src/data/` - Data generation and preprocessing utilities
@@ -14,11 +14,6 @@ This repository contains the implementation of physics-informed neural networks 
 - `experiments/` - Experiment configurations and results
 
 ## Quick Start
-
-1. Install dependencies: `pip install -r requirements.txt`
-2. Generate training data: `python scripts/gen_data.sh`
-3. Train PINN model: `python scripts/train_pinn.sh`
-4. Run optimization: `python scripts/optimize.sh`
 
 ## Documentation
 
