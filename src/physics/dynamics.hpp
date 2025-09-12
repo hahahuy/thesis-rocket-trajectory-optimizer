@@ -4,6 +4,9 @@
 #include <vector>
 #include <cmath>
 #include <cassert>
+#include "physics/aerodynamics/aerodynamics.hpp"
+#include "physics/environment/earth_rotation.hpp"
+#include "physics/propulsion/staging.hpp"
 
 namespace physics {
 
@@ -81,11 +84,17 @@ public:
         
         // Wind parameters (optional)
         bool enable_wind;  ///< Enable wind effects
+
+        // Extended models
+        physics::aerodynamics::AeroParams aero; ///< Aerodynamic parameters (Mach-dependent Cd)
+        physics::environment::EarthRotationParams earth; ///< Earth rotation parameters
+        physics::propulsion::MultiStageVehicle *vehicle; ///< Optional multi-stage vehicle (owned elsewhere)
         
         Params() : Cd(0.3), A(1.0), Isp(300.0), Tmax(100000.0), 
                    m_dry(1000.0), m_prop(4000.0),
                    rho0(1.225), H(8400.0), g0(9.81), R_earth(6.371e6),
-                   enable_wind(false) {}
+                   enable_wind(false),
+                   aero(), earth(), vehicle(nullptr) {}
     };
 
     /**
@@ -177,6 +186,23 @@ public:
         const AscentDynamics::State& s0,
         const std::function<AscentDynamics::Control(double)>& control_func,
         const AscentDynamics::Params& params,
+        double t0,
+        double tf,
+        double rtol = 1e-6,
+        double atol = 1e-8,
+        double max_step = 1.0
+    );
+
+    /**
+     * @brief Adaptive RK45 with simple staging events
+     * If Params.vehicle is provided, performs stage separation when mass
+     * reaches current stage dry mass. Adjusts state mass and advances stage.
+     */
+    static std::vector<std::pair<double, AscentDynamics::State>> integrate_rk45_with_staging(
+        const RHSFunction& rhs,
+        const AscentDynamics::State& s0,
+        const std::function<AscentDynamics::Control(double, int /*stage*/)> &control_func,
+        AscentDynamics::Params& params,
         double t0,
         double tf,
         double rtol = 1e-6,

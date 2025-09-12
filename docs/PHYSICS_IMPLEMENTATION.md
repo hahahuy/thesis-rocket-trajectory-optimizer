@@ -216,3 +216,117 @@ python3 ../scripts/simple_plot.py rocket_trajectory.csv
 ```
 
 The implementation successfully provides a robust foundation for rocket trajectory optimization with validated physics, comprehensive testing, and efficient numerical methods.
+
+## 9. Implementation Priority Matrix
+
+| Model                     | Impact | Complexity | Priority | Urgency        | Files to Create                 |
+|---------------------------|--------|------------|-----------|----------------|---------------------------------|
+| ISA Atmosphere            | High   | Low        | 🔥🔥🔥   | Urgent         | `isa_atmosphere.hpp/cpp`        |
+| Mach-dependent Drag       | High   | Medium     | 🔥🔥🔥   | Urgent         | `aerodynamics.hpp/cpp`          |
+| Earth Rotation            | High   | Medium     | 🔥🔥     | Urgent         | `earth_rotation.hpp/cpp`        |
+| Multi-stage               | High   | High       | 🔥🔥     | Urgent         | `staging.hpp/cpp`               |
+| Event Detection System    | High   | Medium     | 🔥🔥     | Urgent         | `event_detection.hpp/cpp`       |
+| Q-Guidance                | Medium | Medium     | 🔥🔥     | Urgent         | `guidance.hpp/cpp`              |
+| Performance Thrust        | Medium | Medium     | 🔥       | Nice-to-have   | `propulsion.hpp/cpp`            |
+| Solar Radiation Pressure  | High   | Low        | 🔥🔥     | Nice-to-have   | `solar_radiation.hpp/cpp`       |
+| 6-DOF Dynamics            | High   | High       | 🔥       | Nice-to-have   | `dynamics_6dof.hpp/cpp`         |
+| Aerodynamic Heating       | Medium | Low        | 🔥       | Nice-to-have   | `thermal.hpp/cpp`               |
+| TVC Dynamics              | Medium | Medium     | ⚠️       | Nice-to-have   | `tvc.hpp/cpp`                   |
+| Flexible Body             | Low    | Very High  | ⚠️       | Nice-to-have   | `flexible_dynamics.hpp/cpp`     |
+| Propellant Slosh          | Low    | High       | ⚠️       | Nice-to-have   | `slosh.hpp/cpp`                 |
+| Shock Wave Interactions   | Low    | High       | 🚀       | Nice-to-have   | `shock_waves.hpp/cpp`           |
+| Viscous Flow Effects      | Low    | High       | 🚀       | Nice-to-have   | `viscous_flow.hpp/cpp`          |
+| Magnetic Field Effects    | Medium | Medium     | 🔥       | Nice-to-have   | `magnetic_field.hpp/cpp`        |
+| GPS/IMU Sensor Models     | Medium | Low        | 🔥       | Nice-to-have   | `sensors.hpp/cpp`               |
+| Ionospheric Effects       | Low    | High       | 🚀       | Nice-to-have   | `ionosphere.hpp/cpp`            |
+| Combustion Instability    | Medium | High       | 🚀       | Nice-to-have   | `combustion.hpp/cpp`            |
+| Aerospike Nozzle          | Low    | Medium     | 🚀       | Nice-to-have   | `aerospike.hpp/cpp`             |
+| Electromagnetic Launch    | Low    | High       | 🚀       | Nice-to-have   | `electromagnetic.hpp/cpp`       |
+| Atmospheric Composition   | Low    | Medium     | 🚀       | Nice-to-have   | `composition.hpp/cpp`           |
+
+- Urgent = high impact, low/medium effort, or necessary for ascent realism and mission events (ISA, Mach/Cd, Earth rotation, staging, event handling, Q-guidance).
+- Nice-to-have = valuable but not blocking initial realistic results.
+
+## 11. Additional Advanced Physics Elements
+
+### 11.1 Solar Radiation Pressure ❌
+- Urgency: Urgent (for orbital/high-altitude)
+- Impact: High | Complexity: Low
+- Integration:
+  - Add `SolarRadiationParams` and `SolarRadiation::compute_solar_pressure_force(...)`
+  - Add optional term to `rhs` when above threshold altitude
+  - Optional eclipse check
+
+### 11.2 Event Detection System ❌
+- Urgency: Urgent
+- Impact: High | Complexity: Medium
+- Integration:
+  - Add `Event` and `EventDetector` with zero-crossing root-finding
+  - Use in integrators for staging, burnout, max-Q, altitude floor, ground impact
+
+### 11.3 Q-Guidance Algorithm ❌
+- Urgency: Urgent (if doing guided ascent)
+- Impact: Medium | Complexity: Medium
+- Integration:
+  - Add `QGuidanceParams` and `QGuidance::compute_acceleration_command(...)`
+  - Map to thrust vector (`T`, `theta`) with rate/angle limits
+
+### 11.4 Magnetic Field Effects ❌
+- Urgency: Nice-to-have
+- Impact: Medium | Complexity: Medium
+- Integration:
+  - `MagneticField::get_earth_field(...)` and torque on attitude DOFs (6-DOF)
+
+### 11.5 GPS/IMU Sensor Models ❌
+- Urgency: Nice-to-have
+- Impact: Medium | Complexity: Low
+- Integration:
+  - Add `GPSModel`, `IMUModel` for measurement simulation; useful for GNC testing
+
+### 11.6 Shock Wave Interactions ❌
+- Urgency: Nice-to-have
+- Impact: Low | Complexity: High
+- Integration:
+  - Add `ShockWaveModel` for oblique/normal shock; adjust drag/lift in supersonic
+
+### 11.7 Combustion Instability ❌
+- Urgency: Nice-to-have
+- Impact: Medium | Complexity: High
+- Integration:
+  - Add `CombustionState`; modulate thrust/ṁ; couple to structural modes if present
+
+### 11.8 Plasma Sheath Effects ❌
+- Urgency: Nice-to-have (research)
+- Impact: Low | Complexity: Very High
+- Integration:
+  - Add `PlasmaSheath` to adjust aero/comm blackout flags at hypersonic speeds
+
+### 11.9 Electromagnetic Launch Assist ❌
+- Urgency: Nice-to-have (concept)
+- Impact: Low | Complexity: High
+- Integration:
+  - Add `ElectromagneticLaunch` force model for rail/track pre-boost
+
+### 11.10 Ionospheric Effects ❌
+- Urgency: Nice-to-have
+- Impact: Low | Complexity: High
+- Integration:
+  - Add `IonosphericEffects` plasma drag at very high altitudes, affects comms
+
+### 11.11 Atmospheric Composition Variations ❌
+- Urgency: Nice-to-have
+- Impact: Low | Complexity: Medium
+- Integration:
+  - Add `CompositionModel`; refine gas constant, γ, heating rates
+
+### 11.12 Viscous Flow / Boundary Layer Drag ❌
+- Urgency: Nice-to-have
+- Impact: Low | Complexity: High
+- Integration:
+  - Add `ViscousFlow` skin friction on wetted area; blends with form drag
+
+### 11.13 Aerospike Nozzle Performance ❌
+- Urgency: Nice-to-have
+- Impact: Low | Complexity: Medium
+- Integration:
+  - Add `AerospikeEngine` altitude-compensating thrust/Isp model

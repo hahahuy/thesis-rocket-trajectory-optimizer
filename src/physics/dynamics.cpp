@@ -1,7 +1,13 @@
 #include "physics/dynamics.hpp"
 #include <algorithm>
 #include <cmath>
+#ifndef M_PI
+#define M_PI 3.14159265358979323846
+#endif
 #include <stdexcept>
+#include "physics/environment/isa_atmosphere.hpp"
+#include "physics/aerodynamics/aerodynamics.hpp"
+#include "physics/environment/earth_rotation.hpp"
 
 namespace physics {
 
@@ -15,8 +21,13 @@ AscentDynamics::State AscentDynamics::rhs(const State& s, const Control& u, cons
     // Velocity magnitude for drag calculation
     double v_mag = std::sqrt(s.vx * s.vx + s.vy * s.vy);
     
-    // Atmospheric density
+    // Atmospheric density: if user sets rho0==0 treat as vacuum and do not override with ISA
     double rho = atmospheric_density(s.y, p);
+    physics::environment::AtmosphereState isa{};
+    if (s.y >= 0.0 && p.rho0 > 0.0) {
+        isa = physics::environment::ISA_Atmosphere::compute_properties(s.y);
+        rho = isa.density;
+    }
     
     // Wind effects (if enabled)
     double wind_x = 0.0, wind_y = 0.0;
@@ -31,10 +42,14 @@ AscentDynamics::State AscentDynamics::rhs(const State& s, const Control& u, cons
     double v_rel_y = s.vy - wind_y;
     double v_rel_mag = std::sqrt(v_rel_x * v_rel_x + v_rel_y * v_rel_y);
     
-    // Drag force magnitude
+    // Drag force magnitude using Mach-dependent Cd when possible
     double drag_mag = 0.0;
-    if (v_rel_mag > 1e-6) { // Avoid division by zero
-        drag_mag = 0.5 * rho * p.Cd * p.A * v_rel_mag * v_rel_mag;
+    if (v_rel_mag > 1e-6) {
+        double a = (isa.speed_of_sound > 1e-9) ? isa.speed_of_sound : std::sqrt(1.4 * 287.05287 * 288.15);
+        double mach = v_rel_mag / a;
+        physics::aerodynamics::AeroParams aeroParams; // default params
+        double Cd_eff = physics::aerodynamics::drag_coefficient(mach, 0.0, aeroParams);
+        drag_mag = 0.5 * rho * Cd_eff * p.A * v_rel_mag * v_rel_mag;
     }
     
     // Thrust components
@@ -48,14 +63,22 @@ AscentDynamics::State AscentDynamics::rhs(const State& s, const Control& u, cons
         drag_y = -drag_mag * v_rel_y / v_rel_mag;
     }
     
-    // Gravity
+    // Gravity and Earth rotation corrections
     double g = gravity(s.y, p);
-    double weight_y = -s.m * g;
+    std::pair<double,double> cent{0.0, 0.0};
+    std::pair<double,double> cor{0.0, 0.0};
+    if (p.earth.enable_centrifugal) {
+        cent = physics::environment::centrifugal_accel_2d(s.x, s.y, p.earth);
+    }
+    if (p.earth.enable_coriolis) {
+        cor = physics::environment::coriolis_accel_2d(s.vx, s.vy, p.earth);
+    }
+    double weight_y = -s.m * g + s.m * cent.second; // reduce effective gravity if enabled
     
     // Acceleration (Newton's second law)
     if (s.m > 1e-3) { // Avoid division by near-zero mass
-        ds_dt.vx = (thrust_x + drag_x) / s.m;
-        ds_dt.vy = (thrust_y + drag_y + weight_y) / s.m;
+        ds_dt.vx = (thrust_x + drag_x) / s.m + cor.first;
+        ds_dt.vy = (thrust_y + drag_y + weight_y) / s.m + cor.second;
     } else {
         ds_dt.vx = 0.0;
         ds_dt.vy = -g; // Free fall if no mass
@@ -281,6 +304,80 @@ double ForwardIntegrator::error_norm(const AscentDynamics::State& error,
     norm += (error.m / scale_m) * (error.m / scale_m);
     
     return std::sqrt(norm / 5.0); // Divide by number of states
+}
+
+std::vector<std::pair<double, AscentDynamics::State>> ForwardIntegrator::integrate_rk45_with_staging(
+    const RHSFunction& rhs,
+    const AscentDynamics::State& s0,
+    const std::function<AscentDynamics::Control(double, int)> &control_func,
+    AscentDynamics::Params& params,
+    double t0,
+    double tf,
+    double rtol,
+    double atol,
+    double max_step
+) {
+    std::vector<std::pair<double, AscentDynamics::State>> trajectory;
+    trajectory.reserve(static_cast<size_t>((tf - t0) / max_step * 2));
+
+    double t = t0;
+    AscentDynamics::State s = s0;
+    double dt = std::min(max_step, (tf - t0) / 100.0);
+    trajectory.emplace_back(t, s);
+
+    const double min_step = 1e-8;
+    const double max_step_growth = 5.0;
+    const double safety_factor = 0.9;
+
+    int stage_index = params.vehicle ? params.vehicle->current_stage : 0;
+
+    while (t < tf) {
+        if (t + dt > tf) dt = tf - t;
+
+        AscentDynamics::Control u = control_func(t + dt/2.0, stage_index);
+
+        auto [s_new, s_error] = rk45_step(rhs, s, u, params, dt);
+        double error = error_norm(s_error, s_new, rtol, atol);
+
+        if (error <= 1.0) {
+            t += dt;
+            s = s_new;
+
+            // Staging check
+            if (params.vehicle) {
+                const auto &veh = *params.vehicle;
+                if (stage_index >= 0 && stage_index < static_cast<int>(veh.stages.size())) {
+                    const auto &st = veh.stages[stage_index];
+                    double stage_dry_mass = st.dry_mass;
+                    if (s.m <= stage_dry_mass + 1e-6) {
+                        // Perform separation: drop dry mass of current stage and advance stage
+                        double mass_before = s.m;
+                        physics::propulsion::StagingLogic::perform_separation(s.m, *params.vehicle);
+                        stage_index = params.vehicle->current_stage;
+                        // Ensure mass is not negative
+                        if (s.m < 0.0) s.m = 0.0;
+                    }
+                }
+            }
+
+            trajectory.emplace_back(t, s);
+
+            if (error > 0.0) {
+                double factor = safety_factor * std::pow(1.0 / error, 0.2);
+                dt = std::min(max_step, std::min(max_step_growth * dt, factor * dt));
+            } else {
+                dt = std::min(max_step, max_step_growth * dt);
+            }
+        } else {
+            double factor = safety_factor * std::pow(1.0 / error, 0.25);
+            dt = std::max(min_step, factor * dt);
+            if (dt < min_step) {
+                throw std::runtime_error("RK45 integrator (staging): Step size became too small");
+            }
+        }
+    }
+
+    return trajectory;
 }
 
 } // namespace physics
