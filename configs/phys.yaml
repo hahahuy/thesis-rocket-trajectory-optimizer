@@ -1,0 +1,24 @@
+# Physical parameters for rocket simulation
+aerodynamics:
+  Cd: 0.3                    # Drag coefficient
+  Cl: 0.0                    # Lift coefficient  
+  S_ref: 0.05                # Reference area [m²] (reduced for smaller rocket)
+  l_ref: 1.2                 # Reference length for moments [m]
+  CL_alpha: 3.5              # Lift curve slope [1/rad]
+  Cm_alpha: -0.8             # Pitch moment coefficient [1/rad]
+  C_delta: 0.05              # Control surface authority [1/rad]
+  delta_limit_deg: 10.0      # Maximum control surface deflection [deg]
+
+inertia:
+  I_b: [1000.0, 0.0, 0.0,    # Inertia tensor [kg⋅m²]
+        0.0, 1000.0, 0.0,
+        0.0, 0.0, 100.0]
+  r_cg: [0.0, 0.0, 0.0]      # Center of gravity offset [m]
+
+propulsion:
+  Isp: 300.0                 # Specific impulse [s]
+  g0: 9.81                   # Standard gravity [m/s²]
+
+atmosphere:
+  rho0: 1.225                # Sea level density [kg/m³]
+  h_scale: 8400.0            # Atmospheric scale height [m]

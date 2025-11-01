@@ -1,0 +1,20 @@
+# Operational limits and constraints
+thrust:
+  T_max: 1000000.0           # Maximum thrust [N]
+
+mass:
+  m_dry: 1000.0              # Dry mass [kg]
+
+aerodynamics:
+  q_max: 40000.0             # Maximum dynamic pressure [Pa] (typical for small rockets)
+  alpha_max: 0.1             # Maximum angle of attack [rad]
+
+guidance:
+  w_gimbal_max: 1.0          # Maximum gimbal rate [rad/s]
+
+structural:
+  n_max: 5.0                 # Maximum load factor [g] (typical for small sounding rockets: 3-5 g)
+
+safety:
+  h_min: 0.0                 # Minimum altitude [m]
+  v_max: 1000.0              # Maximum velocity [m/s]

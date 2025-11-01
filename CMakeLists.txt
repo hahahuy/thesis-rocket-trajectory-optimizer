@@ -1,87 +1,62 @@
-cmake_minimum_required(VERSION 3.18 FATAL_ERROR)
-project(pinn_rocket_trajectory LANGUAGES CXX)
+cmake_minimum_required(VERSION 3.16)
+project(rocket_trajectory_optimizer)
 
-# C++ standard
-set(CMAKE_CXX_STANDARD 20)
+set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
-set(CMAKE_CXX_EXTENSIONS OFF)
+set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 
-# Enable position independent code
-set(CMAKE_POSITION_INDEPENDENT_CODE ON)
+# Find required packages
+find_package(Eigen3 REQUIRED)
+find_package(PkgConfig REQUIRED)
 
-# Set default build type
-if(NOT CMAKE_BUILD_TYPE)
-    set(CMAKE_BUILD_TYPE Release)
-endif()
+# Find Google Test
+find_package(GTest REQUIRED)
 
-# Platform-specific flags
-if(MSVC)
-    add_compile_options(/W4)
-else()
-    add_compile_options(-Wall -Wextra -Wpedantic)
-endif()
+# Include directories
+include_directories(${CMAKE_SOURCE_DIR}/src)
+include_directories(${EIGEN3_INCLUDE_DIR})
 
-# Configure header (kept minimal)
-configure_file(
-    "${CMAKE_CURRENT_SOURCE_DIR}/include/config.h.in"
-    "${CMAKE_CURRENT_SOURCE_DIR}/include/config.h"
-)
+# Compiler flags
+set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wall -Wextra -O2")
 
-# Main library target (exclude logging.cpp to avoid spdlog dependency)
-add_library(pinn_rocket_lib
-    src/utils/io.cpp
-    src/physics/aerodynamics/aerodynamics.cpp
-    src/physics/environment/earth_rotation.cpp
-    src/physics/environment/isa_atmosphere.cpp
-    src/physics/propulsion/staging.cpp
+# Add executable for types demo
+add_executable(types_demo bin/run_types_demo.cpp)
+target_link_libraries(types_demo Eigen3::Eigen)
+
+# Add executable for dynamics demo
+add_executable(dynamics_demo 
+    bin/run_dynamics_demo.cpp
     src/physics/dynamics.cpp
+    src/physics/integrator.cpp
+    src/physics/atmosphere.cpp
+    src/physics/constraints.cpp
 )
+target_link_libraries(dynamics_demo Eigen3::Eigen)
 
-target_include_directories(pinn_rocket_lib PUBLIC
-    ${CMAKE_CURRENT_SOURCE_DIR}/src
-    ${CMAKE_CURRENT_SOURCE_DIR}/include
+# Add test executables
+add_executable(test_types tests/test_types.cpp)
+target_link_libraries(test_types Eigen3::Eigen GTest::gtest GTest::gtest_main)
+
+add_executable(test_dynamics 
+    tests/test_dynamics.cpp
+    src/physics/dynamics.cpp
+    src/physics/integrator.cpp
+    src/physics/atmosphere.cpp
+    src/physics/constraints.cpp
 )
+target_link_libraries(test_dynamics Eigen3::Eigen GTest::gtest GTest::gtest_main)
 
-# Testing setup with FetchContent for GoogleTest
-include(FetchContent)
-set(BUILD_GMOCK OFF CACHE BOOL "Disable gmock" FORCE)
-set(INSTALL_GTEST OFF CACHE BOOL "Disable install for gtest" FORCE)
-FetchContent_Declare(
-  googletest
-  URL https://github.com/google/googletest/archive/refs/tags/v1.14.0.zip
+add_executable(test_constraints 
+    tests/test_constraints.cpp
+    src/physics/dynamics.cpp
+    src/physics/integrator.cpp
+    src/physics/atmosphere.cpp
+    src/physics/constraints.cpp
 )
-FetchContent_MakeAvailable(googletest)
+target_link_libraries(test_constraints Eigen3::Eigen GTest::gtest GTest::gtest_main)
 
+# Enable testing
 enable_testing()
-
-add_executable(test_dynamics tests/test_dynamics.cpp)
-target_link_libraries(test_dynamics
-    PRIVATE pinn_rocket_lib GTest::gtest_main
-)
-add_test(NAME DynamicsTests COMMAND test_dynamics)
-
-add_executable(validate_dynamics tests/validate_dynamics.cpp)
-target_link_libraries(validate_dynamics PRIVATE pinn_rocket_lib)
-
-add_executable(run_trajectory_demo tests/validate_dynamics.cpp)
-target_link_libraries(run_trajectory_demo PRIVATE pinn_rocket_lib)
-
-# Installation (library only)
-install(TARGETS pinn_rocket_lib
-    LIBRARY DESTINATION lib
-    ARCHIVE DESTINATION lib
-    RUNTIME DESTINATION bin
-)
-install(DIRECTORY include/ DESTINATION include/pinn_rocket
-    FILES_MATCHING PATTERN "*.h" PATTERN "*.hpp"
-)
-
-# Summary
-message(STATUS "")
-message(STATUS "=== Configuration Summary ===")
-message(STATUS "Build type: ${CMAKE_BUILD_TYPE}")
-message(STATUS "C++ standard: ${CMAKE_CXX_STANDARD}")
-message(STATUS "Compiler: ${CMAKE_CXX_COMPILER_ID} ${CMAKE_CXX_COMPILER_VERSION}")
-message(STATUS "GoogleTest: Fetched via FetchContent")
-message(STATUS "===============================")
-message(STATUS "")
+add_test(NAME TypesTest COMMAND test_types)
+add_test(NAME DynamicsTest COMMAND test_dynamics)
+add_test(NAME ConstraintsTest COMMAND test_constraints)

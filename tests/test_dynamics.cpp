@@ -1,341 +1,293 @@
 #include <gtest/gtest.h>
-#include "physics/dynamics.hpp"
-#include <cmath>
-#include <vector>
-#include <iostream>
-#include <chrono>
+#include <Eigen/Dense>
+#include "../src/physics/types.hpp"
+#include "../src/physics/dynamics.hpp"
+#include "../src/physics/integrator.hpp"
+#include "../src/physics/atmosphere.hpp"
+#include "../src/physics/constraints.hpp"
 
-#ifndef M_PI
-#define M_PI 3.14159265358979323846
-#endif
-#ifndef M_E
-#define M_E 2.71828182845904523536
-#endif
-
-using namespace physics;
+using namespace rocket_physics;
 
 class DynamicsTest : public ::testing::Test {
 protected:
     void SetUp() override {
-        // Standard rocket parameters
-        params.Cd = 0.3;
-        params.A = 1.0;           // 1 m² reference area
-        params.Isp = 300.0;       // 300 s specific impulse
-        params.Tmax = 50000.0;    // 50 kN max thrust
-        params.m_dry = 1000.0;    // 1000 kg dry mass
-        params.m_prop = 4000.0;   // 4000 kg propellant
-        params.rho0 = 1.225;      // kg/m³ sea level density
-        params.H = 8400.0;        // 8.4 km scale height
-        params.g0 = 9.81;         // m/s² standard gravity
-        params.R_earth = 6.371e6; // Earth radius
-        params.enable_wind = false;
+        // Set up test data
+        phys_.Cd = 0.3;
+        phys_.Cl = 0.0;
+        phys_.S_ref = 1.0;
+        phys_.I_b = Matrix3d::Identity() * 1000.0;
+        phys_.r_cg = Vec3::Zero();
+        phys_.Isp = 300.0;
+        phys_.g0 = 9.81;
+        phys_.rho0 = 1.225;
+        phys_.h_scale = 8400.0;
         
-        // Initial state: on ground, at rest, full fuel
-        state0.x = 0.0;
-        state0.y = 0.0;
-        state0.vx = 0.0;
-        state0.vy = 0.0;
-        state0.m = params.m_dry + params.m_prop; // 5000 kg total
+        limits_.T_max = 1000000.0;
+        limits_.m_dry = 1000.0;
+        limits_.q_max = 50000.0;
+        limits_.w_gimbal_max = 1.0;
+        limits_.alpha_max = 0.1;
+        limits_.n_max = 10.0;
+        
+        // Create test state
+        test_state_.r_i = Vec3(1000.0, 2000.0, 3000.0);
+        test_state_.v_i = Vec3(100.0, 200.0, 300.0);
+        test_state_.q_bi = Quaterniond::Identity();
+        test_state_.w_b = Vec3::Zero();
+        test_state_.m = 5000.0;
+        
+        // Create test control
+        test_control_.T = 100000.0;
+        test_control_.uT_b = Vec3(0.0, 0.0, 1.0);
+        
+        // Create dynamics object
+        dynamics_ = createDynamics(phys_, limits_);
     }
     
-    AscentDynamics::Params params;
-    AscentDynamics::State state0;
-    
-    // Tolerance for floating point comparisons
-    const double tol = 1e-6;
+    Phys phys_;
+    Limits limits_;
+    State test_state_;
+    Control test_control_;
+    std::shared_ptr<Dynamics> dynamics_;
 };
 
-// Test atmospheric density model
-TEST_F(DynamicsTest, AtmosphericDensity) {
-    // Sea level density
-    double rho_0 = AscentDynamics::atmospheric_density(0.0, params);
-    EXPECT_NEAR(rho_0, params.rho0, tol);
-    
-    // At scale height, density should be 1/e of sea level
-    double rho_H = AscentDynamics::atmospheric_density(params.H, params);
-    EXPECT_NEAR(rho_H, params.rho0 / M_E, 1e-3);
-    
-    // At high altitude, density should be very small
-    double rho_high = AscentDynamics::atmospheric_density(50000.0, params);
-    EXPECT_LT(rho_high, 0.01 * params.rho0);
-    
-    // Density should decrease monotonically with altitude
-    double rho_1km = AscentDynamics::atmospheric_density(1000.0, params);
-    double rho_2km = AscentDynamics::atmospheric_density(2000.0, params);
-    EXPECT_GT(rho_1km, rho_2km);
+// Test Dynamics class
+TEST_F(DynamicsTest, DynamicsConstructor) {
+    EXPECT_NE(dynamics_, nullptr);
+    EXPECT_EQ(dynamics_->getPhys().Cd, phys_.Cd);
+    EXPECT_EQ(dynamics_->getLimits().T_max, limits_.T_max);
 }
 
-// Test gravity model
-TEST_F(DynamicsTest, GravityModel) {
-    // At sea level
-    double g_0 = AscentDynamics::gravity(0.0, params);
-    EXPECT_NEAR(g_0, params.g0, tol);
+TEST_F(DynamicsTest, ComputeDerivative) {
+    State state_dot = dynamics_->computeDerivative(test_state_, test_control_, 0.0);
     
-    // At low altitude (should be constant)
-    double g_10km = AscentDynamics::gravity(10000.0, params);
-    EXPECT_NEAR(g_10km, params.g0, tol);
+    // Check that derivative is computed
+    EXPECT_NE(state_dot.r_i, Vec3::Zero()); // Position derivative should be velocity
+    EXPECT_NE(state_dot.v_i, Vec3::Zero()); // Velocity derivative should be non-zero
+    EXPECT_NE(state_dot.m, 0.0); // Mass derivative should be negative (fuel consumption)
     
-    // At high altitude (should decrease)
-    double g_100km = AscentDynamics::gravity(100000.0, params);
-    EXPECT_LT(g_100km, params.g0);
-    EXPECT_GT(g_100km, 0.9 * params.g0); // Should still be close for 100 km
+    // Position derivative should equal velocity
+    EXPECT_EQ(state_dot.r_i, test_state_.v_i);
 }
 
-// Test RHS function with zero control (free fall)
-TEST_F(DynamicsTest, FreeFall) {
-    AscentDynamics::Control zero_control(0.0, 0.0);
+TEST_F(DynamicsTest, ComputeForcesAndMoments) {
+    auto [forces, moments] = dynamics_->computeForcesAndMoments(test_state_, test_control_, 0.0);
     
-    // From rest at sea level
-    auto ds_dt = AscentDynamics::rhs(state0, zero_control, params);
+    // Forces should be non-zero
+    EXPECT_NE(forces, Vec3::Zero());
     
-    // Position derivatives should be velocities
-    EXPECT_NEAR(ds_dt.x, state0.vx, tol);
-    EXPECT_NEAR(ds_dt.y, state0.vy, tol);
-    
-    // Horizontal acceleration should be zero (no thrust, no initial velocity)
-    EXPECT_NEAR(ds_dt.vx, 0.0, tol);
-    
-    // Vertical acceleration should be -g (downward)
-    EXPECT_NEAR(ds_dt.vy, -params.g0, tol);
-    
-    // Mass should not change (no thrust)
-    EXPECT_NEAR(ds_dt.m, 0.0, tol);
+    // Thrust force should be in thrust direction
+    Vec3 expected_thrust = test_control_.T * test_control_.uT_b;
+    EXPECT_NEAR(forces.norm(), expected_thrust.norm(), 1e-6);
 }
 
-// Test RHS function with vertical thrust
-TEST_F(DynamicsTest, VerticalThrust) {
-    // Thrust exactly balancing weight
-    double thrust_mag = state0.m * params.g0;
-    AscentDynamics::Control control(thrust_mag, M_PI/2.0); // Vertical thrust
+TEST_F(DynamicsTest, ComputeAtmosphericProperties) {
+    double altitude = 1000.0;
+    auto [density, pressure] = dynamics_->computeAtmosphericProperties(altitude);
     
-    auto ds_dt = AscentDynamics::rhs(state0, control, params);
-    
-    // Should have near-zero vertical acceleration (thrust balances weight)
-    EXPECT_NEAR(ds_dt.vy, 0.0, 1e-3);
-    
-    // Mass should decrease due to propellant consumption
-    double expected_mass_rate = -thrust_mag / (params.Isp * params.g0);
-    EXPECT_NEAR(ds_dt.m, expected_mass_rate, tol);
+    EXPECT_GT(density, 0.0);
+    EXPECT_GT(pressure, 0.0);
+    EXPECT_LT(density, phys_.rho0); // Density should decrease with altitude
 }
 
-// Test mass conservation
-TEST_F(DynamicsTest, MassConservation) {
-    double thrust = 30000.0; // 30 kN
-    AscentDynamics::Control control(thrust, M_PI/2.0);
+TEST_F(DynamicsTest, ComputeDynamicPressure) {
+    double q = dynamics_->computeDynamicPressure(test_state_);
     
-    // Simulate for a short time
-    double dt = 0.1; // 0.1 second
-    auto rhs_func = [](const AscentDynamics::State& s, 
-                      const AscentDynamics::Control& u, 
-                      const AscentDynamics::Params& p) {
-        return AscentDynamics::rhs(s, u, p);
+    EXPECT_GE(q, 0.0);
+    EXPECT_LT(q, 1e6); // Reasonable upper bound
+}
+
+TEST_F(DynamicsTest, ComputeAngleOfAttack) {
+    double alpha = dynamics_->computeAngleOfAttack(test_state_);
+    
+    EXPECT_GE(alpha, 0.0);
+    EXPECT_LE(alpha, M_PI/2.0); // Should be between 0 and 90 degrees
+}
+
+TEST_F(DynamicsTest, ComputeLoadFactor) {
+    double n = dynamics_->computeLoadFactor(test_state_, test_control_, 0.0);
+    
+    EXPECT_GT(n, 0.0);
+    EXPECT_LT(n, 100.0); // Reasonable upper bound
+}
+
+TEST_F(DynamicsTest, CheckConstraints) {
+    Diag diag = dynamics_->checkConstraints(test_state_, test_control_, 0.0);
+    
+    EXPECT_GE(diag.rho, 0.0);
+    EXPECT_GE(diag.q, 0.0);
+    EXPECT_GE(diag.alpha, 0.0);
+    EXPECT_GE(diag.n, 0.0);
+}
+
+// Test Integrator classes
+TEST_F(DynamicsTest, RK4Integrator) {
+    auto integrator = createRK4Integrator(dynamics_);
+    EXPECT_NE(integrator, nullptr);
+    
+    State new_state = integrator->integrate(test_state_, test_control_, 0.0, 0.1);
+    
+    // State should be different after integration
+    EXPECT_NE(new_state.r_i, test_state_.r_i);
+    EXPECT_NE(new_state.v_i, test_state_.v_i);
+    EXPECT_NE(new_state.m, test_state_.m);
+    
+    // Mass should decrease (fuel consumption)
+    EXPECT_LT(new_state.m, test_state_.m);
+}
+
+TEST_F(DynamicsTest, RK45Integrator) {
+    auto integrator = createRK45Integrator(dynamics_, 1e-6, 1e-9, 1.0);
+    EXPECT_NE(integrator, nullptr);
+    
+    State new_state = integrator->integrate(test_state_, test_control_, 0.0, 0.1);
+    
+    // State should be different after integration
+    EXPECT_NE(new_state.r_i, test_state_.r_i);
+    EXPECT_NE(new_state.v_i, test_state_.v_i);
+    EXPECT_NE(new_state.m, test_state_.m);
+    
+    // Mass should decrease (fuel consumption)
+    EXPECT_LT(new_state.m, test_state_.m);
+}
+
+TEST_F(DynamicsTest, IntegratorInterval) {
+    auto integrator = createRK4Integrator(dynamics_);
+    
+    auto control_func = [](double t) -> Control {
+        return Control(100000.0, Vec3(0.0, 0.0, 1.0));
     };
     
-    std::vector<AscentDynamics::Control> controls(10, control); // 1 second total
-    auto trajectory = ForwardIntegrator::integrate_rk4(rhs_func, state0, controls, params, dt);
+    std::vector<State> states = integrator->integrateInterval(test_state_, control_func, 0.0, 1.0, 0.1);
     
-    // Check mass decrease
-    double initial_mass = trajectory[0].m;
-    double final_mass = trajectory.back().m;
-    double mass_consumed = initial_mass - final_mass;
+    EXPECT_GT(states.size(), 1);
+    EXPECT_EQ(states[0].r_i, test_state_.r_i);
     
-    // Expected mass consumption: T * t / (Isp * g0)
-    double expected_mass_consumed = thrust * 1.0 / (params.Isp * params.g0);
-    
-    EXPECT_NEAR(mass_consumed, expected_mass_consumed, 0.01); // 1% tolerance
-    EXPECT_GE(final_mass, params.m_dry); // Should not go below dry mass
+    // Mass should decrease over time
+    for (size_t i = 1; i < states.size(); ++i) {
+        EXPECT_LT(states[i].m, states[i-1].m);
+    }
 }
 
-// Test energy conservation in vacuum (no drag, no thrust)
-TEST_F(DynamicsTest, EnergyConservation) {
-    // Start with some velocity
-    AscentDynamics::State state_moving = state0;
-    state_moving.vy = 100.0; // 100 m/s upward
+// Test Atmosphere classes
+TEST_F(DynamicsTest, ISAAtmosphere) {
+    auto atmosphere = createISAAtmosphere();
+    EXPECT_NE(atmosphere, nullptr);
     
-    // No thrust, no atmosphere (set density to zero for this test)
-    AscentDynamics::Params params_vacuum = params;
-    params_vacuum.rho0 = 0.0; // No atmosphere
+    double altitude = 1000.0;
+    auto [density, pressure] = atmosphere->computeProperties(altitude);
     
-    AscentDynamics::Control no_control(0.0, 0.0);
-    
-    auto rhs_func = [](const AscentDynamics::State& s, 
-                      const AscentDynamics::Control& u, 
-                      const AscentDynamics::Params& p) {
-        return AscentDynamics::rhs(s, u, p);
-    };
-    
-    // Simulate trajectory
-    double dt = 0.01;
-    std::vector<AscentDynamics::Control> controls(1000, no_control); // 10 seconds
-    auto trajectory = ForwardIntegrator::integrate_rk4(rhs_func, state_moving, controls, params_vacuum, dt);
-    
-    // Calculate total energy at different points
-    auto total_energy = [&](const AscentDynamics::State& s) {
-        double kinetic = 0.5 * s.m * (s.vx * s.vx + s.vy * s.vy);
-        double potential = s.m * params.g0 * s.y;
-        return kinetic + potential;
-    };
-    
-    double E0 = total_energy(trajectory[0]);
-    double E_mid = total_energy(trajectory[trajectory.size()/2]);
-    double E_final = total_energy(trajectory.back());
-    
-    // Energy should be conserved (within numerical tolerance)
-    EXPECT_NEAR(E0, E_mid, 0.01 * E0);   // 1% tolerance
-    EXPECT_NEAR(E0, E_final, 0.01 * E0); // 1% tolerance
+    EXPECT_GT(density, 0.0);
+    EXPECT_GT(pressure, 0.0);
+    EXPECT_LT(density, 1.225); // Should be less than sea level density
 }
 
-// Test integrator accuracy
-TEST_F(DynamicsTest, IntegratorAccuracy) {
-    // Simple test case: constant acceleration
-    AscentDynamics::Control control(state0.m * params.g0 * 1.5, M_PI/2.0); // 50% more than weight for clear upward motion
+TEST_F(DynamicsTest, ExponentialAtmosphere) {
+    auto atmosphere = createExponentialAtmosphere(1.225, 8400.0, 288.15);
+    EXPECT_NE(atmosphere, nullptr);
     
-    auto rhs_func = [](const AscentDynamics::State& s, 
-                      const AscentDynamics::Control& u, 
-                      const AscentDynamics::Params& p) {
-        return AscentDynamics::rhs(s, u, p);
-    };
+    double altitude = 1000.0;
+    double density = atmosphere->computeDensity(altitude);
+    double pressure = atmosphere->computePressure(altitude);
     
-    // Compare different step sizes
-    double dt_coarse = 0.1;
-    double dt_fine = 0.01;
-    
-    std::vector<AscentDynamics::Control> controls_coarse(10, control);  // 1 second
-    std::vector<AscentDynamics::Control> controls_fine(100, control);   // 1 second
-    
-    auto traj_coarse = ForwardIntegrator::integrate_rk4(rhs_func, state0, controls_coarse, params, dt_coarse);
-    auto traj_fine = ForwardIntegrator::integrate_rk4(rhs_func, state0, controls_fine, params, dt_fine);
-    
-    // Both should have positive altitude
-    EXPECT_GT(traj_coarse.back().y, 0.0);
-    EXPECT_GT(traj_fine.back().y, 0.0);
-    
-    // Check final positions are reasonably close
-    double error_y = std::abs(traj_coarse.back().y - traj_fine.back().y);
-    EXPECT_LT(error_y, 1.0); // Less than 1 meter difference
-    
-    // For this simple case, just check they're close
-    EXPECT_NEAR(traj_coarse.back().y, traj_fine.back().y, 1.0);
+    EXPECT_GT(density, 0.0);
+    EXPECT_GT(pressure, 0.0);
+    EXPECT_LT(density, 1.225);
 }
 
-// Test adaptive integrator
-TEST_F(DynamicsTest, AdaptiveIntegrator) {
-    auto rhs_func = [](const AscentDynamics::State& s, 
-                      const AscentDynamics::Control& u, 
-                      const AscentDynamics::Params& p) {
-        return AscentDynamics::rhs(s, u, p);
-    };
+TEST_F(DynamicsTest, WindModels) {
+    auto no_wind = createNoWindModel();
+    EXPECT_NE(no_wind, nullptr);
     
-    // Constant control function with sufficient thrust
-    auto control_func = [&](double t) {
-        return AscentDynamics::Control(state0.m * params.g0 * 2.0, M_PI/2.0); // 2x weight in thrust
-    };
+    Vec3 wind = no_wind->computeWind(Vec3::Zero(), 0.0);
+    EXPECT_EQ(wind, Vec3::Zero());
     
-    // Test adaptive integrator
-    auto trajectory = ForwardIntegrator::integrate_rk45(
-        rhs_func, state0, control_func, params, 
-        0.0, 2.0,    // 0 to 2 seconds (shorter time for more predictable behavior)
-        1e-6, 1e-8,  // Tolerances
-        0.1          // Max step
-    );
+    auto constant_wind = createConstantWindModel(Vec3(10.0, 5.0, 0.0));
+    EXPECT_NE(constant_wind, nullptr);
     
-    // Should have reasonable number of points
-    EXPECT_GT(trajectory.size(), 5);
-    EXPECT_LT(trajectory.size(), 1000);
+    wind = constant_wind->computeWind(Vec3::Zero(), 0.0);
+    EXPECT_EQ(wind, Vec3(10.0, 5.0, 0.0));
+}
+
+// Test Constraint classes
+TEST_F(DynamicsTest, ConstraintChecker) {
+    auto checker = createConstraintChecker(limits_);
+    EXPECT_NE(checker, nullptr);
     
-    // Time should be monotonically increasing
-    for (size_t i = 1; i < trajectory.size(); ++i) {
-        EXPECT_GT(trajectory[i].first, trajectory[i-1].first);
+    auto violations = checker->checkConstraints(test_state_, test_control_, 0.0);
+    EXPECT_GE(violations.size(), 0);
+    
+    bool has_violations = checker->hasViolations(test_state_, test_control_, 0.0);
+    EXPECT_FALSE(has_violations); // Should not have violations with reasonable test data
+}
+
+TEST_F(DynamicsTest, ConstraintPenalty) {
+    std::vector<double> weights = {1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0};
+    auto penalty = createConstraintPenalty(weights);
+    EXPECT_NE(penalty, nullptr);
+    
+    auto checker = createConstraintChecker(limits_);
+    auto violations = checker->checkConstraints(test_state_, test_control_, 0.0);
+    
+    double penalty_value = penalty->computePenalty(violations);
+    EXPECT_GE(penalty_value, 0.0);
+}
+
+TEST_F(DynamicsTest, ConstraintHandler) {
+    auto checker = createConstraintChecker(limits_);
+    auto penalty = createConstraintPenalty({1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0});
+    auto handler = createConstraintHandler(checker, penalty);
+    
+    EXPECT_NE(handler, nullptr);
+    EXPECT_EQ(handler->getChecker(), checker);
+    EXPECT_EQ(handler->getPenalty(), penalty);
+    
+    Control modified_control = handler->handleViolations(test_state_, test_control_, 0.0);
+    EXPECT_EQ(modified_control.T, test_control_.T); // Should be unchanged for valid control
+}
+
+// Test error handling
+TEST_F(DynamicsTest, InvalidState) {
+    State invalid_state;
+    invalid_state.m = -1.0; // Invalid mass
+    
+    EXPECT_THROW(dynamics_->computeDerivative(invalid_state, test_control_, 0.0), std::exception);
+}
+
+TEST_F(DynamicsTest, InvalidControl) {
+    Control invalid_control;
+    invalid_control.T = -1000.0; // Invalid thrust
+    
+    EXPECT_THROW(dynamics_->computeDerivative(test_state_, invalid_control, 0.0), std::exception);
+}
+
+// Test numerical stability
+TEST_F(DynamicsTest, NumericalStability) {
+    auto integrator = createRK4Integrator(dynamics_);
+    
+    // Test with very small time step
+    State state1 = integrator->integrate(test_state_, test_control_, 0.0, 1e-6);
+    State state2 = integrator->integrate(test_state_, test_control_, 0.0, 1e-6);
+    
+    // Results should be identical for same inputs
+    EXPECT_NEAR((state1.r_i - state2.r_i).norm(), 0.0, 1e-10);
+    EXPECT_NEAR((state1.v_i - state2.v_i).norm(), 0.0, 1e-10);
+    EXPECT_NEAR(std::abs(state1.m - state2.m), 0.0, 1e-10);
+}
+
+// Test performance
+TEST_F(DynamicsTest, Performance) {
+    auto integrator = createRK4Integrator(dynamics_);
+    
+    auto start = std::chrono::high_resolution_clock::now();
+    
+    for (int i = 0; i < 1000; ++i) {
+        integrator->integrate(test_state_, test_control_, 0.0, 0.01);
     }
     
-    // Final time should be close to 2.0
-    EXPECT_NEAR(trajectory.back().first, 2.0, 1e-6);
+    auto end = std::chrono::high_resolution_clock::now();
+    auto duration = std::chrono::duration_cast<std::chrono::microseconds>(end - start);
     
-    // Rocket should have gained altitude (with 2x thrust, should definitely go up)
-    EXPECT_GT(trajectory.back().second.y, 5.0); // At least 5 meters up
-    
-    // Mass should have decreased
-    EXPECT_LT(trajectory.back().second.m, state0.m);
-    
-    // Rocket should have positive upward velocity
-    EXPECT_GT(trajectory.back().second.vy, 0.0);
-}
-
-// Test wind effects
-TEST_F(DynamicsTest, WindEffects) {
-    params.enable_wind = true;
-    
-    // State with horizontal velocity
-    AscentDynamics::State state_horizontal = state0;
-    state_horizontal.vx = 50.0; // 50 m/s horizontal
-    state_horizontal.y = 1000.0; // 1 km altitude
-    
-    AscentDynamics::Control no_control(0.0, 0.0);
-    
-    auto ds_dt_no_wind = AscentDynamics::rhs(state_horizontal, no_control, params);
-    
-    // With wind enabled, there should be additional drag effects
-    // (The wind model creates relative velocity, affecting drag)
-    
-    // This is more of a smoke test - wind should affect the dynamics
-    // The exact values depend on the wind model implementation
-    EXPECT_TRUE(std::isfinite(ds_dt_no_wind.vx));
-    EXPECT_TRUE(std::isfinite(ds_dt_no_wind.vy));
-}
-
-// Test edge cases
-TEST_F(DynamicsTest, EdgeCases) {
-    // Test with very small mass (near dry mass)
-    AscentDynamics::State low_mass_state = state0;
-    low_mass_state.m = params.m_dry + 1.0; // Just 1 kg of fuel left
-    
-    AscentDynamics::Control high_thrust(params.Tmax, M_PI/2.0);
-    
-    auto ds_dt = AscentDynamics::rhs(low_mass_state, high_thrust, params);
-    
-    // Should not allow mass to go below dry mass
-    EXPECT_GE(low_mass_state.m + ds_dt.m, params.m_dry - tol);
-    
-    // Test with zero velocity (should not crash)
-    auto ds_dt_zero_v = AscentDynamics::rhs(state0, high_thrust, params);
-    EXPECT_TRUE(std::isfinite(ds_dt_zero_v.vx));
-    EXPECT_TRUE(std::isfinite(ds_dt_zero_v.vy));
-    
-    // Test at very high altitude
-    AscentDynamics::State high_alt_state = state0;
-    high_alt_state.y = 200000.0; // 200 km
-    
-    auto ds_dt_high = AscentDynamics::rhs(high_alt_state, high_thrust, params);
-    EXPECT_TRUE(std::isfinite(ds_dt_high.vx));
-    EXPECT_TRUE(std::isfinite(ds_dt_high.vy));
-}
-
-// Performance test for integrator
-TEST_F(DynamicsTest, IntegratorPerformance) {
-    auto rhs_func = [](const AscentDynamics::State& s, 
-                      const AscentDynamics::Control& u, 
-                      const AscentDynamics::Params& p) {
-        return AscentDynamics::rhs(s, u, p);
-    };
-    
-    AscentDynamics::Control control(25000.0, M_PI/4.0);
-    std::vector<AscentDynamics::Control> controls(1000, control); // 1000 steps
-    
-    auto start_time = std::chrono::high_resolution_clock::now();
-    
-    auto trajectory = ForwardIntegrator::integrate_rk4(rhs_func, state0, controls, params, 0.01);
-    
-    auto end_time = std::chrono::high_resolution_clock::now();
-    auto duration = std::chrono::duration_cast<std::chrono::milliseconds>(end_time - start_time);
-    
-    // Should complete in reasonable time (less than 1 second for 1000 steps)
-    EXPECT_LT(duration.count(), 1000);
-    
-    // Should produce expected number of points
-    EXPECT_EQ(trajectory.size(), 1001); // Initial + 1000 steps
-}
-
-int main(int argc, char **argv) {
-    ::testing::InitGoogleTest(&argc, argv);
-    return RUN_ALL_TESTS();
+    // Should complete 1000 integrations in reasonable time
+    EXPECT_LT(duration.count(), 1000000); // Less than 1 second
 }

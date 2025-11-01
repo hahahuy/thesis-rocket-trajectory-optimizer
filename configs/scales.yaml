@@ -1,0 +1,21 @@
+# Characteristic scales for non-dimensionalization
+length:
+  L_ref: 1.0                 # Reference length [m]
+
+time:
+  T_ref: 1.0                 # Reference time [s]
+
+mass:
+  M_ref: 1000.0              # Reference mass [kg]
+
+velocity:
+  V_ref: 100.0               # Reference velocity [m/s]
+
+force:
+  F_ref: 100000.0            # Reference force [N]
+
+pressure:
+  P_ref: 101325.0            # Reference pressure [Pa]
+
+density:
+  RHO_ref: 1.225             # Reference density [kg/m³]
