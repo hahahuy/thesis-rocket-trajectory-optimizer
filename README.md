@@ -1,6 +1,6 @@
-# Rocket Trajectory Optimization with Physics-Informed Neural Networks
+# Rocket Trajectory Optimizer
 
-This repository implements **physics-informed neural networks (PINNs)** for **rocket trajectory optimization**, combining traditional **optimal control methods** with modern **machine learning** approaches. The goal is to develop a **computationally efficient surrogate** that accelerates trajectory design and enables onboard guidance while remaining physically consistent.
+This repository implements a 6-DOF rocket physics core (WP1) and an optimal control baseline (WP2) using direct collocation with CasADi/IPOPT. It also includes scripts for validation, benchmarking, robustness, and documentation for future PINN-based work.
 
 ---
 
@@ -14,20 +14,17 @@ This repository implements **physics-informed neural networks (PINNs)** for **ro
 
 ---
 
-## Project Structure
+## Project Structure (high level)
 
-* `src/physics/` — Deterministic 6-DOF physics & dynamics models
-* `src/solver/` — Baseline optimal control solvers (collocation, shooting)
-* `src/models/` — PINN and hybrid neural network models
-* `src/train/` — Training scripts and utilities
-* `src/optim/` — Optimization pipeline using surrogate models
-* `src/data/` — Data generation and preprocessing utilities
-* `src/eval/` — Metrics and uncertainty quantification tools
-* `src/utils/` — General utilities (IO, logging, config loaders)
-* `notebooks/` — Jupyter notebooks for exploration and examples
-* `experiments/` — Experiment configurations, results, logs, checkpoints
-* `tests/` — Unit tests (dynamics, PINN loss, optimizer gradients)
-* `docs/` — Design notes, figures, thesis documentation
+* `src/physics/` — C++ 6-DOF physics library (dynamics, constraints, smooth funcs)
+* `src/solver/` — Python WP2 solver (CasADi collocation, constraints, utils)
+* `src/utils/` — C++ utils (scaling, reproducibility) and Python helpers
+* `scripts/` — Validation, benchmarking, robustness, plotting
+* `configs/` — YAML configs: `phys.yaml`, `limits.yaml`, `scales.yaml`, `ocp.yaml`
+* `tests/` — C++ physics tests and Python WP2 tests
+* `build/` — CMake build outputs (ignored)
+* `experiments/` — Outputs from validation/benchmarks/robustness
+* `docs/` — Design + comprehensive WP1/WP2 documentation
 
 ---
 
@@ -40,129 +37,73 @@ git clone https://github.com/hahahuy/thesis-rocket-trajectory-optimizer.git
 cd thesis-rocket-trajectory-optimizer
 ```
 
-2. **Install environment**
+2. **Install environment (Python + IPOPT deps)**
 
 ```bash
-conda env create -f environment.yml
-conda activate rocket-pinn
+# Python deps (editable install)
+pip install -e .
+
+# Core packages if needed
+pip install casadi numpy scipy matplotlib h5py pyyaml pytest pytest-cov
+
+# Optional: test which linear solvers are available for IPOPT
+python3 scripts/test_linear_solvers.py
 ```
 
-3. **Generate baseline data**
+Tip: Prefer MUMPS by default; HSL/MA97 gives best performance if installed. See the HSL/MUMPS section in `docs/wp2_comprehensive_description.md`.
+
+3. **Build WP1 (C++ physics demos/validation)**
 
 ```bash
-bash scripts/gen_data.sh
+mkdir -p build; cd build
+cmake ..
+make -j$(nproc) validate_dynamics
 ```
 
-4. **Train PINN**
+4. **Run validation and generate reference CSVs**
 
 ```bash
-bash scripts/train_pinn.sh
+./build/validate_dynamics --all
 ```
 
-5. **Optimize trajectory with surrogate**
+5. **WP2 (OCP baseline) — run with Make**
 
 ```bash
-bash scripts/optimize.sh
+make -f Makefile.wp2 test; make -f Makefile.wp2 validate; make -f Makefile.wp2 benchmark-quick; make -f Makefile.wp2 robustness
 ```
 
-6. **Evaluate results**
+6. **Optional quick scripts (if present)**
 
 ```bash
-bash scripts/evaluate.sh
+# Example scripts
+bash scripts/benchmark_solver.py --quick
+python3 scripts/plot_trajectory.py --input experiments/wp2_validation.json || true
 ```
 
 ---
 
 ## Documentation
 
-* See `docs/design.md` for detailed design notes.
-* See `docs/thesis_notes.md` for research rationale, experiments, and milestones.
-* Figures and diagrams are stored in `docs/figures/`.
+* WP1 (physics core): `docs/wp1_comprehensive_description.md`
+* WP2 (OCP baseline): `docs/wp2_comprehensive_description.md`
+  - Includes: operations guide (how to run), and HSL/MUMPS installation notes
+* Design overview: `docs/design.md`
+* Setup: `docs/setup_guide.md`, `docs/QUICK_START_HSL.md`
+* CI/setup: `docs/ci_setup.md`
 
 ---
 
-## Repository Structure (Detailed)
+## Key Commands
 
-```
-├── README.md
-├── LICENSE
-├── pyproject.toml
-├── requirements.txt
-├── environment.yml
-├── setup.cfg
-├── .gitignore
-├── Makefile
-├── docker/
-│   ├── Dockerfile
-│   └── docker-compose.yml
-├── configs/
-│   ├── default.yaml
-│   ├── train.yaml
-│   └── optimize.yaml
-├── data/
-│   ├── raw/        # raw solver outputs (read-only)
-│   ├── processed/  # normalized, split datasets (HDF5/NPZ)
-│   └── README.md   # dataset format and sources
-├── src/
-│   ├── __init__.py
-│   ├── physics/            # 6-DOF deterministic physics & dynamics
-│   │   ├── dynamics.py      # ODE definitions (forces, moments)
-│   │   ├── atmosphere.py    # density, wind models
-│   │   └── constraints.py   # q-limit, path constraints
-│   ├── solver/             # baseline optimal control
-│   │   ├── collocation.py   # CasADi collocation wrapper
-│   │   ├── shooting.py      # alternative methods
-│   │   └── utils.py         # helpers, initial guess gen
-│   ├── data/               # ETL and dataset pipeline
-│   │   ├── generator.py     # OCP sweeps, trajectory generation
-│   │   ├── preprocess.py    # normalization, splits
-│   │   └── storage.py       # HDF5/NPZ IO
-│   ├── models/             # PINN + residual networks
-│   │   ├── pinn.py          # PINN model class, losses
-│   │   ├── residual_net.py  # hybrid residual approach
-│   │   └── architectures.py # MLP blocks, Fourier features
-│   ├── train/              # training loops
-│   │   ├── train_pinn.py
-│   │   ├── train_residual.py
-│   │   └── callbacks.py     # schedulers, early stop, L-BFGS
-│   ├── optim/              # optimization with surrogate
-│   │   ├── parameterize.py  # control knot parameterization
-│   │   ├── optimize_with_surrogate.py
-│   │   └── cma_es_wrapper.py
-│   ├── experiments/        # orchestration helpers
-│   │   ├── run_experiment.py
-│   │   └── reproduce_figure.py
-│   ├── eval/
-│   │   ├── metrics.py       # RMSE, terminal objective, constraint violations
-│   │   └── uq.py            # ensemble & MC dropout
-│   └── utils/
-│       ├── io.py            # config loader, checkpoint IO
-│       ├── logging.py       # structured logging
-│       └── tests_utils.py
-├── notebooks/
-│   ├── 00-overview.ipynb
-│   ├── 01-data-generation.ipynb
-│   ├── 02-train-pinn.ipynb
-│   └── 03-optimize-using-surrogate.ipynb
-├── experiments/
-│   ├── exp_2025-09-01_baseline/
-│   │   ├── config.yaml
-│   │   ├── checkpoints/
-│   │   └── logs/
-│   └── exp_.../
-├── scripts/
-│   ├── gen_data.sh
-│   ├── train_pinn.sh
-│   ├── optimize.sh
-│   └── evaluate.sh
-├── tests/
-│   ├── test_dynamics.py
-│   ├── test_pinn_loss.py
-│   └── test_optimizer_gradients.py
-└── docs/
-    ├── design.md
-    ├── figures/
-    └── thesis_notes.md
+```bash
+# WP1 build + validation
+cd build; cmake ..; make -j$(nproc) validate_dynamics; cd -; ./build/validate_dynamics --all
+
+# WP2 tasks
+make -f Makefile.wp2 test; make -f Makefile.wp2 validate; make -f Makefile.wp2 benchmark-quick; make -f Makefile.wp2 robustness
+
+# Coverage (Python WP2)
+make -f Makefile.wp2 coverage; xdg-open htmlcov/index.html || true
 ```
 
 ---

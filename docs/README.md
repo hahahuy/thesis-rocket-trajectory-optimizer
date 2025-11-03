@@ -14,20 +14,17 @@ This repository implements **physics-informed neural networks (PINNs)** for **ro
 
 ---
 
-## Project Structure
+## Project Structure (high level)
 
-* `src/physics/` — Deterministic 6-DOF physics & dynamics models
-* `src/solver/` — Baseline optimal control solvers (collocation, shooting)
-* `src/models/` — PINN and hybrid neural network models
-* `src/train/` — Training scripts and utilities
-* `src/optim/` — Optimization pipeline using surrogate models
-* `src/data/` — Data generation and preprocessing utilities
-* `src/eval/` — Metrics and uncertainty quantification tools
-* `src/utils/` — General utilities (IO, logging, config loaders)
-* `notebooks/` — Jupyter notebooks for exploration and examples
-* `experiments/` — Experiment configurations, results, logs, checkpoints
-* `tests/` — Unit tests (dynamics, PINN loss, optimizer gradients)
-* `docs/` — Design notes, figures, thesis documentation
+* `src/physics/` — C++ 6-DOF physics library (dynamics, constraints, smooth funcs)
+* `src/solver/` — Python WP2 solver (CasADi collocation, constraints, utils)
+* `src/utils/` — C++ utils (scaling, reproducibility) and Python helpers
+* `scripts/` — Validation, benchmarking, robustness, plotting
+* `configs/` — YAML configs: `phys.yaml`, `limits.yaml`, `scales.yaml`, `ocp.yaml`
+* `tests/` — C++ physics tests and Python WP2 tests
+* `build/` — CMake build outputs (ignored)
+* `experiments/` — Outputs from validation/benchmarks/robustness
+* `docs/` — Design + comprehensive WP1/WP2 documentation
 
 ---
 
