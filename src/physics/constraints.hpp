@@ -143,8 +143,15 @@ public:
      */
     double getMaxViolationMagnitude(const State& state, const Control& control, double t) const;
 
-private:
+protected:  // Changed to protected so ConstraintHandler can access
     Limits limits_;
+    
+public:
+    /**
+     * @brief Get limits
+     * @return Reference to limits
+     */
+    const Limits& getLimits() const { return limits_; }
     
     // Helper methods
     double computeDynamicPressure(const State& state) const;

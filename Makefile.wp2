@@ -1,0 +1,94 @@
+# Makefile for WP2 (Optimal Control Baseline)
+#
+# Usage: make -f Makefile.wp2 <target>
+
+.PHONY: all test validate benchmark robustness coverage clean help
+
+PYTHON := python3
+PYTEST := pytest
+
+# Directories
+PROJECT_ROOT := $(shell pwd)
+SCRIPTS_DIR := $(PROJECT_ROOT)/scripts
+TESTS_DIR := $(PROJECT_ROOT)/tests
+EXPERIMENTS_DIR := $(PROJECT_ROOT)/experiments
+
+# Default target
+all: test validate
+
+help:
+	@echo "WP2 Make Targets:"
+	@echo "  make test          - Run all WP2 unit and integration tests"
+	@echo "  make validate      - Full WP2 validation (WP1 → OCP → compare)"
+	@echo "  make benchmark     - Performance benchmarks"
+	@echo "  make robustness    - Robustness sweep (parameter variations)"
+	@echo "  make coverage      - Code coverage report"
+	@echo "  make all           - Run test + validate"
+	@echo "  make clean         - Clean generated files"
+
+# Run all WP2 tests (no coverage to avoid pytest-cov dependency)
+test:
+	@echo "Running WP2 tests..."
+	$(PYTEST) $(TESTS_DIR)/test_solver.py $(TESTS_DIR)/test_solver_coverage.py \
+	          $(TESTS_DIR)/test_solver_edge_cases.py $(TESTS_DIR)/test_cpp_python_parity.py \
+	          -v --tb=short --no-cov
+
+# Run integration tests (requires IPOPT)
+test-integration:
+	@echo "Running WP2 integration tests..."
+	$(PYTEST) $(TESTS_DIR)/test_solver_integration.py $(TESTS_DIR)/test_solver_integration_full.py \
+	          -v --tb=short -m integration
+
+# Full validation pipeline
+validate:
+	@echo "Running full WP2 validation..."
+	$(PYTHON) $(SCRIPTS_DIR)/validate_wp2_full.py \
+	          --tolerance 0.01 --generate-wp1 \
+	          --output $(EXPERIMENTS_DIR)/wp2_validation.json
+
+# Performance benchmarks
+benchmark:
+	@echo "Running WP2 performance benchmarks..."
+	$(PYTHON) $(SCRIPTS_DIR)/benchmark_solver.py \
+	          --output $(EXPERIMENTS_DIR)/wp2_benchmark.json \
+	          --mesh-sizes 10 20 30
+
+benchmark-quick:
+	@echo "Running quick WP2 benchmark..."
+	$(PYTHON) $(SCRIPTS_DIR)/benchmark_solver.py \
+	          --output $(EXPERIMENTS_DIR)/wp2_benchmark.json \
+	          --quick
+
+# Robustness sweep
+robustness:
+	@echo "Running WP2 robustness sweep..."
+	$(PYTHON) $(SCRIPTS_DIR)/robustness_sweep.py \
+	          --output $(EXPERIMENTS_DIR)/wp2_robustness.json \
+	          --n-cases 20
+
+# Code coverage (requires pytest-cov: pip install pytest-cov)
+coverage:
+	@echo "Generating WP2 coverage report..."
+	@echo "Note: This requires pytest-cov. Install with: pip install pytest-cov"
+	@echo "Note: Skipping slow integration tests for coverage (run 'make validate' for full tests)"
+	$(PYTEST) $(TESTS_DIR)/test_solver*.py $(TESTS_DIR)/test_cpp_python_parity.py \
+	          --cov=src/solver --cov-report=term-missing --cov-report=html \
+	          -m "not slow" --ignore=$(TESTS_DIR)/test_solver_integration_full.py
+	@echo "Coverage report: htmlcov/index.html"
+
+# Clean generated files
+clean:
+	@echo "Cleaning WP2 generated files..."
+	rm -rf $(EXPERIMENTS_DIR)/wp2_*.json
+	rm -rf htmlcov/
+	rm -rf .pytest_cache/
+	rm -rf __pycache__/
+	find . -type d -name __pycache__ -exec rm -r {} + 2>/dev/null || true
+	find . -type f -name "*.pyc" -delete
+
+# Create experiments directory
+$(EXPERIMENTS_DIR):
+	mkdir -p $(EXPERIMENTS_DIR)
+
+# Ensure experiments directory exists before running scripts
+validate benchmark robustness: $(EXPERIMENTS_DIR)

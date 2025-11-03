@@ -1,0 +1,349 @@
+{
+  "timestamp": "2025-11-03T11:27:15.060462",
+  "n_cases": 20,
+  "n_converged": 20,
+  "n_constraints_ok": 0,
+  "convergence_rate": 1.0,
+  "results": [
+    {
+      "case_id": 1,
+      "params": {
+        "m0": 50.0,
+        "Cd": 0.24,
+        "Isp": 300.0,
+        "T_max": 3200.0
+      },
+      "success": true,
+      "converged": true,
+      "constraints_satisfied": false,
+      "iterations": 270,
+      "objective": 0.0012640273571378202,
+      "constraint_violation": 1.1102230246251565e-12,
+      "mass_violation": -2954.811965051609,
+      "thrust_violation": -615.8269118533603
+    },
+    {
+      "case_id": 2,
+      "params": {
+        "m0": 40.0,
+        "Cd": 0.24,
+        "Isp": 240.0,
+        "T_max": 3200.0
+      },
+      "success": true,
+      "converged": true,
+      "constraints_satisfied": false,
+      "iterations": 217,
+      "objective": 0.0014296539651468265,
+      "constraint_violation": 5.551115123125783e-13,
+      "mass_violation": -2953.008598078971,
+      "thrust_violation": -638.7198034454009
+    },
+    {
+      "case_id": 3,
+      "params": {
+        "m0": 40.0,
+        "Cd": 0.36,
+        "Isp": 300.0,
+        "T_max": 4000.0
+      },
+      "success": true,
+      "converged": true,
+      "constraints_satisfied": false,
+      "iterations": 321,
+      "objective": 0.0015347644787198078,
+      "constraint_violation": 5.551115123125783e-13,
+      "mass_violation": -2953.0092058529585,
+      "thrust_violation": -799.2599742568532
+    },
+    {
+      "case_id": 4,
+      "params": {
+        "m0": 50.0,
+        "Cd": 0.24,
+        "Isp": 300.0,
+        "T_max": 4000.0
+      },
+      "success": true,
+      "converged": true,
+      "constraints_satisfied": false,
+      "iterations": 236,
+      "objective": 0.00010393367182359725,
+      "constraint_violation": 1.1102230246251565e-12,
+      "mass_violation": -2976.9270016007736,
+      "thrust_violation": -2506.3455145155767
+    },
+    {
+      "case_id": 5,
+      "params": {
+        "m0": 40.0,
+        "Cd": 0.36,
+        "Isp": 240.0,
+        "T_max": 3200.0
+      },
+      "success": true,
+      "converged": true,
+      "constraints_satisfied": false,
+      "iterations": 346,
+      "objective": 0.0015402042665186855,
+      "constraint_violation": 1.1102230246251565e-12,
+      "mass_violation": -2953.050795433345,
+      "thrust_violation": -637.1980021380664
+    },
+    {
+      "case_id": 6,
+      "params": {
+        "m0": 50.0,
+        "Cd": 0.24,
+        "Isp": 240.0,
+        "T_max": 4000.0
+      },
+      "success": true,
+      "converged": true,
+      "constraints_satisfied": false,
+      "iterations": 223,
+      "objective": 0.0019222755946657344,
+      "constraint_violation": 1.1003926886354876e-07,
+      "mass_violation": -2953.2189023067112,
+      "thrust_violation": -721.3053957108555
+    },
+    {
+      "case_id": 7,
+      "params": {
+        "m0": 40.0,
+        "Cd": 0.3,
+        "Isp": 240.0,
+        "T_max": 4000.0
+      },
+      "success": true,
+      "converged": true,
+      "constraints_satisfied": false,
+      "iterations": 195,
+      "objective": 0.0020223471378812974,
+      "constraint_violation": 5.551115123125783e-13,
+      "mass_violation": -2952.741258399909,
+      "thrust_violation": -33.766639883565404
+    },
+    {
+      "case_id": 8,
+      "params": {
+        "m0": 60.0,
+        "Cd": 0.3,
+        "Isp": 360.0,
+        "T_max": 4000.0
+      },
+      "success": true,
+      "converged": true,
+      "constraints_satisfied": false,
+      "iterations": 316,
+      "objective": 0.001292162701702182,
+      "constraint_violation": 5.551115123125783e-13,
+      "mass_violation": -2954.556413828475,
+      "thrust_violation": -802.7097816603914
+    },
+    {
+      "case_id": 9,
+      "params": {
+        "m0": 40.0,
+        "Cd": 0.24,
+        "Isp": 300.0,
+        "T_max": 4000.0
+      },
+      "success": true,
+      "converged": true,
+      "constraints_satisfied": false,
+      "iterations": 194,
+      "objective": 0.001583855598255468,
+      "constraint_violation": 1.2872221621940128e-08,
+      "mass_violation": -2953.0037104188514,
+      "thrust_violation": -762.6623712508631
+    },
+    {
+      "case_id": 10,
+      "params": {
+        "m0": 40.0,
+        "Cd": 0.3,
+        "Isp": 300.0,
+        "T_max": 3200.0
+      },
+      "success": true,
+      "converged": true,
+      "constraints_satisfied": false,
+      "iterations": 209,
+      "objective": 0.0012479962520046683,
+      "constraint_violation": 1.1102230246251565e-12,
+      "mass_violation": -2953.0070371463,
+      "thrust_violation": -638.4647042560905
+    },
+    {
+      "case_id": 11,
+      "params": {
+        "m0": 50.0,
+        "Cd": 0.36,
+        "Isp": 300.0,
+        "T_max": 4000.0
+      },
+      "success": true,
+      "converged": true,
+      "constraints_satisfied": false,
+      "iterations": 321,
+      "objective": 0.0023128117132955595,
+      "constraint_violation": 8.881784197001252e-13,
+      "mass_violation": -2953.0332303545465,
+      "thrust_violation": -873.3221488951858
+    },
+    {
+      "case_id": 12,
+      "params": {
+        "m0": 50.0,
+        "Cd": 0.24,
+        "Isp": 360.0,
+        "T_max": 3200.0
+      },
+      "success": true,
+      "converged": true,
+      "constraints_satisfied": false,
+      "iterations": 383,
+      "objective": 0.001008682345059242,
+      "constraint_violation": 2.777712504453689e-10,
+      "mass_violation": -2953.0004340100545,
+      "thrust_violation": -636.5970777388225
+    },
+    {
+      "case_id": 13,
+      "params": {
+        "m0": 60.0,
+        "Cd": 0.3,
+        "Isp": 300.0,
+        "T_max": 4000.0
+      },
+      "success": true,
+      "converged": true,
+      "constraints_satisfied": false,
+      "iterations": 152,
+      "objective": 0.0015432327223834363,
+      "constraint_violation": 2.01260536014658e-09,
+      "mass_violation": -2952.8626616335637,
+      "thrust_violation": -800.4839379168784
+    },
+    {
+      "case_id": 14,
+      "params": {
+        "m0": 50.0,
+        "Cd": 0.24,
+        "Isp": 360.0,
+        "T_max": 4800.0
+      },
+      "success": true,
+      "converged": true,
+      "constraints_satisfied": false,
+      "iterations": 343,
+      "objective": 0.0015456154237654118,
+      "constraint_violation": 2.1861105299336715e-08,
+      "mass_violation": -2953.0005705949566,
+      "thrust_violation": -914.4080105471767
+    },
+    {
+      "case_id": 15,
+      "params": {
+        "m0": 60.0,
+        "Cd": 0.3,
+        "Isp": 300.0,
+        "T_max": 4800.0
+      },
+      "success": true,
+      "converged": true,
+      "constraints_satisfied": false,
+      "iterations": 300,
+      "objective": 0.0020879361272250208,
+      "constraint_violation": 1.4291345884487328e-12,
+      "mass_violation": -2952.98413946411,
+      "thrust_violation": -324.21685223410714
+    },
+    {
+      "case_id": 16,
+      "params": {
+        "m0": 50.0,
+        "Cd": 0.36,
+        "Isp": 240.0,
+        "T_max": 3200.0
+      },
+      "success": true,
+      "converged": true,
+      "constraints_satisfied": false,
+      "iterations": 274,
+      "objective": 0.00395047582924235,
+      "constraint_violation": 2.922153075068934e-10,
+      "mass_violation": -2952.154723075738,
+      "thrust_violation": -780.3671503685609
+    },
+    {
+      "case_id": 17,
+      "params": {
+        "m0": 60.0,
+        "Cd": 0.36,
+        "Isp": 240.0,
+        "T_max": 4000.0
+      },
+      "success": true,
+      "converged": true,
+      "constraints_satisfied": false,
+      "iterations": 167,
+      "objective": 0.0019183886445830467,
+      "constraint_violation": 2.231743678748899e-12,
+      "mass_violation": -2953.0097893588236,
+      "thrust_violation": -800.3098723428998
+    },
+    {
+      "case_id": 18,
+      "params": {
+        "m0": 60.0,
+        "Cd": 0.24,
+        "Isp": 360.0,
+        "T_max": 4000.0
+      },
+      "success": true,
+      "converged": true,
+      "constraints_satisfied": false,
+      "iterations": 196,
+      "objective": 0.0015494731467811107,
+      "constraint_violation": 5.551115123125783e-13,
+      "mass_violation": -2953.564550819342,
+      "thrust_violation": -807.5016977746232
+    },
+    {
+      "case_id": 19,
+      "params": {
+        "m0": 60.0,
+        "Cd": 0.24,
+        "Isp": 240.0,
+        "T_max": 4000.0
+      },
+      "success": true,
+      "converged": true,
+      "constraints_satisfied": false,
+      "iterations": 167,
+      "objective": 0.0019120552314007,
+      "constraint_violation": 1.1102230246251565e-12,
+      "mass_violation": -2953.104299135563,
+      "thrust_violation": -800.0546829962918
+    },
+    {
+      "case_id": 20,
+      "params": {
+        "m0": 50.0,
+        "Cd": 0.3,
+        "Isp": 300.0,
+        "T_max": 4000.0
+      },
+      "success": true,
+      "converged": true,
+      "constraints_satisfied": false,
+      "iterations": 277,
+      "objective": 0.0015451093057095022,
+      "constraint_violation": 5.551115123125783e-13,
+      "mass_violation": -2953.0039512873304,
+      "thrust_violation": -751.4951382970362
+    }
+  ]
+}

@@ -130,6 +130,22 @@ private:
     Vec3 computeGravity(const Vec3& position) const;
     Vec3 computeWind(const Vec3& position, double t) const;
     Vec3 computeAerodynamicForces(const State& state, const Vec3& wind) const;
+    
+    /**
+     * @brief Compute aerodynamic lift force
+     * @param state Current state
+     * @param wind Wind velocity
+     * @return Lift force in body frame [N]
+     */
+    Vec3 computeLiftForce(const State& state, const Vec3& wind) const;
+    
+    /**
+     * @brief Compute aerodynamic drag force
+     * @param state Current state
+     * @param wind Wind velocity
+     * @return Drag force in body frame [N]
+     */
+    Vec3 computeDragForce(const State& state, const Vec3& wind) const;
     Vec3 computeThrustForces(const Control& control) const;
     Vec3 computeAerodynamicMoments(const State& state, const Vec3& wind) const;
     Vec3 computeThrustMoments(const Control& control) const;

@@ -52,7 +52,6 @@ external/*.tar.bz2
 CMakeFiles/
 CMakeCache.txt
 cmake_install.cmake
-Makefile
 install_manifest.txt
 compile_commands.json
 CTestTestfile.cmake
@@ -102,6 +101,11 @@ share/python-wheels/
 .installed.cfg
 *.egg
 MANIFEST
+
+# Coverage
+.coverage
+.coverage.*
+htmlcov/
 
 # Virtual environments
 venv/

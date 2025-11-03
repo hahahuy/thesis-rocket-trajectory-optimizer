@@ -13,6 +13,28 @@ using Quaterniond = Eigen::Quaterniond;
 using Matrix3d = Eigen::Matrix3d;
 
 /**
+ * @brief State vector indices for standardization
+ */
+enum class StateIndex {
+    X = 0, Y, Z,                    // Position (0-2)
+    VX, VY, VZ,                     // Velocity (3-5)
+    Q0, Q1, Q2, Q3,                 // Quaternion (6-9)
+    WX, WY, WZ,                     // Angular velocity (10-12)
+    M                               // Mass (13)
+};
+
+/**
+ * @brief Control vector indices for standardization
+ */
+enum class ControlIndex {
+    T = 0,                          // Thrust magnitude (0)
+    THETA,                          // Gimbal angle theta (1) - or uT_x
+    PHI,                            // Gimbal angle phi (2) - or uT_y
+    UT_Z,                           // Thrust direction z component (3)
+    DELTA                           // Control surface deflection (4)
+};
+
+/**
  * @brief 6-DOF rocket state representation
  * 
  * Contains 14 variables:

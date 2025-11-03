@@ -1,0 +1,144 @@
+# Optimal Control Problem Configuration
+
+# Problem setup
+problem:
+  name: "rocket_ascent_ocp"
+  description: "6-DOF rocket ascent trajectory optimization"
+  
+  # State dimension
+  nx: 14  # [x, y, z, vx, vy, vz, q0, q1, q2, q3, wx, wy, wz, m]
+  
+  # Control dimension  
+  nu: 4   # [T, theta_g, phi_g, delta]
+  
+  # Transcription parameters
+  transcription:
+    method: "hermite_simpson"  # Options: hermite_simpson, lgr
+    n_intervals: 60            # Number of collocation intervals
+    adaptive: false            # Use adaptive mesh refinement
+    
+  # Time parameters
+  time:
+    t0: 0.0                    # Initial time [s]
+    tf_min: 30.0               # Minimum final time [s]
+    tf_max: 120.0              # Maximum final time [s]
+    tf_fixed: null             # Fixed final time [s] (null = free)
+    
+  # Objective function
+  objective:
+    type: "fuel_minimization"  # Options: fuel_minimization, time_minimization, weighted
+    lambda1: 1.0               # Weight for time term (if weighted)
+    lambda2: 0.0               # Weight for fuel term (if weighted)
+
+# Initial conditions
+initial:
+  x: 0.0                       # Initial x position [m]
+  y: 0.0                       # Initial y position [m]
+  z: 0.0                       # Initial altitude [m]
+  vx: 0.0                      # Initial x velocity [m/s]
+  vy: 0.0                      # Initial y velocity [m/s]
+  vz: 0.0                      # Initial z velocity [m/s]
+  q0: 1.0                      # Initial quaternion w
+  q1: 0.0                      # Initial quaternion x
+  q2: 0.0                      # Initial quaternion y
+  q3: 0.0                      # Initial quaternion z
+  wx: 0.0                      # Initial angular velocity x [rad/s]
+  wy: 0.0                      # Initial angular velocity y [rad/s]
+  wz: 0.0                      # Initial angular velocity z [rad/s]
+  m: null                      # Initial mass [kg] (null = load from phys.yaml)
+
+# Terminal conditions
+terminal:
+  y_min: null                  # Minimum final altitude [m] (null = free)
+  y_target: null               # Target final altitude [m] (null = free)
+  v_final_min: null            # Minimum final velocity [m/s] (null = free)
+
+# State bounds
+bounds:
+  x_min: [-1e6, -1e6, -100.0, -1e4, -1e4, -1e4, -1.1, -1.1, -1.1, -1.1, -10.0, -10.0, -10.0, 0.0]
+  x_max: [1e6, 1e6, 1e6, 1e4, 1e4, 1e4, 1.1, 1.1, 1.1, 1.1, 10.0, 10.0, 10.0, 1e6]
+  
+  # Control bounds (will be overridden by limits.yaml, but here for reference)
+  u_min: [0.0, -0.1745, -0.1745, -0.1745]  # [T, theta_g, phi_g, delta] in rad
+  u_max: [null, 0.1745, 0.1745, 0.1745]    # null = use limits.yaml T_max
+
+# Path constraints
+path_constraints:
+  dynamic_pressure:
+    enabled: true
+    max: null                   # null = use limits.yaml q_max
+    
+  load_factor:
+    enabled: true
+    max: null                   # null = use limits.yaml n_max
+    
+  angle_of_attack:
+    enabled: false              # Optional
+    max: null
+    
+  mass:
+    enabled: true
+    min: null                   # null = use limits.yaml m_dry
+
+# Solver configuration (IPOPT)
+solver:
+  name: "ipopt"
+  max_iter: 1000
+  tol: 1e-6
+  acceptable_tol: 1e-5
+  acceptable_iter: 5
+  print_level: 5
+  linear_solver: "auto"         # Options: "auto" (detects best), ma27, ma57, ma77, ma86, ma97, mumps
+  hessian_approximation: "limited-memory"  # Options: exact, limited-memory
+  warm_start_init_point: "yes"
+  mu_init: 1e-3
+  mu_strategy: "monotone"       # Options: monotone, adaptive
+  
+  # Convergence settings
+  max_cpu_time: 3600.0          # Maximum CPU time [s]
+  max_wall_time: 3600.0         # Maximum wall time [s]
+  
+  # Regularization (optional)
+  regularization:
+    enabled: false
+    type: "control_penalty"     # Options: control_penalty, state_penalty, jerk_penalty
+    weight: 1e-6
+
+# Initial guess strategy
+initial_guess:
+  strategy: "vertical_ascent"   # Options: vertical_ascent, polynomial, linear, from_file
+  file: null                    # If from_file, path to initial guess HDF5
+  
+  # Vertical ascent parameters
+  vertical_ascent:
+    T_initial: null             # null = use 80% of T_max
+    T_taper_time: null          # null = use 80% of tf_max
+    theta_g_initial: 1.5708     # 90 degrees [rad]
+    theta_g_final: 0.0          # 0 degrees [rad]
+    phi_g: 0.0                  # Constant phi_g [rad]
+
+# Scaling (optional, for numerical stability)
+scaling:
+  enabled: true
+  use_config_scales: true      # Use scales from configs/scales.yaml
+  
+  # Manual scaling (if use_config_scales = false)
+  manual:
+    x_scale: [1e4, 1e4, 1e4, 1e3, 1e3, 1e3, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 50.0]
+    u_scale: [5e3, 0.1745, 0.1745, 0.1745]
+    t_scale: 50.0
+
+# Output settings
+output:
+  save_trajectory: true
+  save_constraints: true
+  save_solver_stats: true
+  format: "hdf5"               # Options: hdf5, npz, json
+  directory: "data/raw/ocp_runs"
+
+# Validation
+validation:
+  check_physics: true           # Validate against WP1 reference
+  tolerance: 1e-3               # Tolerance for trajectory comparison
+  plot_results: true
+

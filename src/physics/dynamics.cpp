@@ -1,4 +1,5 @@
 #include "dynamics.hpp"
+#include "smooth_functions.hpp"
 #include <cmath>
 #include <algorithm>
 
@@ -103,11 +104,12 @@ double Dynamics::computeAngleOfAttack(const State& state) const {
     Vec3 v_rel_body = transformToBodyFrame(relative_velocity, state.q_bi);
     
     // Compute angle of attack (angle between velocity and body x-axis)
+    // Use smooth atan2 to avoid NaN at low speed
     double vx = v_rel_body.x();
     double vy = v_rel_body.y();
     double vz = v_rel_body.z();
     
-    return std::atan2(std::sqrt(vy*vy + vz*vz), vx);
+    return smooth::smooth_atan2(std::sqrt(vy*vy + vz*vz), vx);
 }
 
 double Dynamics::computeLoadFactor(const State& state, const Control& control, double t) const {
@@ -135,7 +137,7 @@ double Dynamics::computeLoadFactor(const State& state, const Control& control, d
     double vx = v_rel_body.x();
     double vy = v_rel_body.y();
     double vz = v_rel_body.z();
-    double alpha = std::atan2(std::sqrt(vy*vy + vz*vz), vx);
+    double alpha = smooth::smooth_atan2(std::sqrt(vy*vy + vz*vz), vx);
     
     // Lift force: L = q * S_ref * CL_alpha * alpha
     double L = q * phys_.S_ref * phys_.CL_alpha * alpha;
@@ -201,7 +203,7 @@ Vec3 Dynamics::computeWind(const Vec3& position, double t) const {
     return Vec3::Zero();
 }
 
-Vec3 Dynamics::computeAerodynamicForces(const State& state, const Vec3& wind) const {
+Vec3 Dynamics::computeDragForce(const State& state, const Vec3& wind) const {
     Vec3 relative_velocity = computeRelativeVelocity(state, wind);
     double speed = relative_velocity.norm();
     
@@ -210,7 +212,7 @@ Vec3 Dynamics::computeAerodynamicForces(const State& state, const Vec3& wind) co
     }
     
     // Compute atmospheric properties
-    double altitude = state.r_i.norm() - 6371000.0;
+    double altitude = std::max(0.0, state.r_i.norm() - 6371000.0);
     double density = computeDensity(altitude);
     
     // Dynamic pressure
@@ -221,12 +223,47 @@ Vec3 Dynamics::computeAerodynamicForces(const State& state, const Vec3& wind) co
     Vec3 v_rel_unit = v_rel_body.normalized();
     
     // Drag force (opposite to velocity direction)
-    Vec3 drag_force = -q * phys_.S_ref * phys_.Cd * v_rel_unit;
+    return -q * phys_.S_ref * phys_.Cd * v_rel_unit;
+}
+
+Vec3 Dynamics::computeLiftForce(const State& state, const Vec3& wind) const {
+    Vec3 relative_velocity = computeRelativeVelocity(state, wind);
+    double speed = relative_velocity.norm();
     
-    // Lift force (perpendicular to velocity direction)
-    Vec3 lift_force = q * phys_.S_ref * phys_.Cl * Vec3(0, -v_rel_unit.z(), v_rel_unit.y());
+    if (speed < 1e-6) {
+        return Vec3::Zero();
+    }
     
-    return drag_force + lift_force;
+    // Compute atmospheric properties
+    double altitude = std::max(0.0, state.r_i.norm() - 6371000.0);
+    double density = computeDensity(altitude);
+    
+    // Dynamic pressure
+    double q = 0.5 * density * speed * speed;
+    
+    // Transform relative velocity to body frame
+    Vec3 v_rel_body = transformToBodyFrame(relative_velocity, state.q_bi);
+    double vx = v_rel_body.x();
+    double vy = v_rel_body.y();
+    double vz = v_rel_body.z();
+    
+    // Angle of attack
+    double alpha = smooth::smooth_atan2(std::sqrt(vy*vy + vz*vz), vx);
+    
+    // Lift force: L = q * S_ref * CL_alpha * alpha
+    // Lift direction: perpendicular to velocity in the plane of attack
+    Vec3 lift_direction = Vec3(0, -vz, vy).normalized();
+    if (lift_direction.norm() < 1e-6) {
+        lift_direction = Vec3(0, 0, 1); // Default to vertical if no lateral component
+    }
+    
+    return q * phys_.S_ref * phys_.CL_alpha * alpha * lift_direction;
+}
+
+Vec3 Dynamics::computeAerodynamicForces(const State& state, const Vec3& wind) const {
+    Vec3 drag = computeDragForce(state, wind);
+    Vec3 lift = computeLiftForce(state, wind);
+    return drag + lift;
 }
 
 Vec3 Dynamics::computeThrustForces(const Control& control) const {
@@ -255,7 +292,7 @@ Vec3 Dynamics::computeAerodynamicMoments(const State& state, const Vec3& wind) c
     double vz = v_rel_body.z();
     
     // Angle of attack
-    double alpha = std::atan2(std::sqrt(vy*vy + vz*vz), vx);
+    double alpha = smooth::smooth_atan2(std::sqrt(vy*vy + vz*vz), vx);
     
     // Pitch moment: M_pitch = q * S_ref * l_ref * (Cm_alpha * alpha + C_delta * delta)
     // Note: delta is obtained from control, but we need to pass it somehow

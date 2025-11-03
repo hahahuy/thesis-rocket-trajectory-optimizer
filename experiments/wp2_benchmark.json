@@ -1,0 +1,31 @@
+{
+  "system_info": {
+    "platform": "Linux-6.16.1-2-cachyos-x86_64-with-glibc2.42",
+    "processor": "",
+    "python_version": "3.10.18",
+    "git_hash": "216f56e9a03ea1da83fdc7cd59db445b3978f16e",
+    "casadi_version": "3.7.2"
+  },
+  "timestamp": "2025-11-03T12:01:04.410054",
+  "benchmarks": [
+    {
+      "label": "N=10",
+      "success": true,
+      "iterations": 380,
+      "solve_time": 8.982244729995728,
+      "solver_time": 8.102762404,
+      "objective": 0.003595127797780151,
+      "constraint_violation": 3.847869939344051e-08,
+      "defect_stats": {
+        "mean": 1291736194392.9258,
+        "max": 8146857014366.695,
+        "min": 7293019.662519368,
+        "std": 2472034722223.9116
+      },
+      "mesh_size": 10,
+      "tf": 75.0,
+      "n_states": 14,
+      "n_controls": 4
+    }
+  ]
+}

@@ -1,21 +1,22 @@
 # Characteristic scales for non-dimensionalization
+# Optimized for O(1) values in trajectory optimization
 length:
-  L_ref: 1.0                 # Reference length [m]
+  L_ref: 1e4                 # Reference length [m] = 10 km
 
 time:
-  T_ref: 1.0                 # Reference time [s]
+  T_ref: 50.0                # Reference time [s]
 
 mass:
-  M_ref: 1000.0              # Reference mass [kg]
+  M_ref: 50.0                # Reference mass [kg]
 
 velocity:
-  V_ref: 100.0               # Reference velocity [m/s]
+  V_ref: 1e3                 # Reference velocity [m/s] = 1000 m/s
 
 force:
-  F_ref: 100000.0            # Reference force [N]
+  F_ref: 5e3                 # Reference force [N] = 5000 N
 
 pressure:
-  P_ref: 101325.0            # Reference pressure [Pa]
+  P_ref: 1e4                 # Reference pressure [Pa] = 10 kPa
 
 density:
   RHO_ref: 1.225             # Reference density [kg/m³]

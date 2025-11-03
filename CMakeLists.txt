@@ -33,6 +33,17 @@ add_executable(dynamics_demo
 )
 target_link_libraries(dynamics_demo Eigen3::Eigen)
 
+# Add executable for validation
+add_executable(validate_dynamics 
+    bin/validate_dynamics.cpp
+    src/physics/dynamics.cpp
+    src/physics/integrator.cpp
+    src/physics/atmosphere.cpp
+    src/physics/constraints.cpp
+    src/utils/scaling.cpp
+)
+target_link_libraries(validate_dynamics Eigen3::Eigen)
+
 # Add test executables
 add_executable(test_types tests/test_types.cpp)
 target_link_libraries(test_types Eigen3::Eigen GTest::gtest GTest::gtest_main)

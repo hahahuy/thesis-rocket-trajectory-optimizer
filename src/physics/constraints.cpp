@@ -161,7 +161,17 @@ double ConstraintChecker::computeAngleOfAttack(const State& state) const {
     double vy = v_body.y();
     double vz = v_body.z();
     
-    return std::atan2(std::sqrt(vy*vy + vz*vz), vx);
+    // Use smooth approximation to avoid NaN
+    double eps = 1e-8;
+    double v_lateral = std::sqrt(vy*vy + vz*vz);
+    if (v_lateral < eps && vx < eps) {
+        return 0.0; // No meaningful angle of attack at zero velocity
+    }
+    double r = std::sqrt(vx*vx + vy*vy + vz*vz);
+    if (r < eps) {
+        return 0.0;
+    }
+    return std::atan2(v_lateral, vx);
 }
 
 double ConstraintChecker::computeAltitude(const State& state) const {
@@ -296,8 +306,10 @@ bool ConstraintHandler::canHandleViolations(const std::vector<ConstraintViolatio
 Control ConstraintHandler::handleThrustViolation(const State& state, const Control& control) const {
     Control modified_control = control;
     
-    if (control.T > checker_->getLimits().T_max) {
-        modified_control.T = checker_->getLimits().T_max;
+    // Get limits from checker
+    const Limits& limits = checker_->getLimits();
+    if (control.T > limits.T_max) {
+        modified_control.T = limits.T_max;
     }
     
     return modified_control;
