@@ -28,6 +28,17 @@ This repository implements a 6-DOF rocket physics core (WP1) and an optimal cont
 
 ---
 
+## Dataset
+
+**Dataset version: wp3_final** (tag: `wp3_final`)
+
+The processed dataset is available in `data/processed/`:
+- `train.h5` (120 samples)
+- `val.h5` (20 samples)  
+- `test.h5` (20 samples)
+
+Dataset card: `reports/DATASET_CARD.json`
+
 ## Quick Start
 
 1. **Clone the repo**

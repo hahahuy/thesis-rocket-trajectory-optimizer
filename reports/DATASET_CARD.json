@@ -1,7 +1,7 @@
 {
   "name": "rocket_6dof_v1",
-  "created_utc": "2025-11-09T09:00:18.004389Z",
-  "git_hash": "ad1b4ad",
+  "created_utc": "2025-11-09T09:18:21.590152Z",
+  "git_hash": "98166d68e5d71a10498aa0c7232985463b30b9c9",
   "sizes": {
     "train": 120,
     "val": 20,
