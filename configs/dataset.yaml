@@ -1,0 +1,32 @@
+dataset:
+  n_train: 120
+  n_val: 20
+  n_test: 20
+  sampler: lhs            # lhs | sobol | grid
+  seed: 2025
+  time_horizon_s: 30.0
+  grid_hz: 50             # 50 Hz uniform grid for stored trajectories
+  retries_per_case: 2
+  parallel_workers: 8
+  store_format: hdf5      # hdf5 | npz
+
+params:                    # sampling ranges (SI, unscaled)
+  m0:        [45.0, 65.0]     # kg
+  Isp:       [220.0, 280.0]   # s
+  Cd:        [0.25, 0.45]
+  CL_alpha:  [2.5, 4.5]       # 1/rad
+  Cm_alpha:  [-1.2, -0.4]     # 1/rad
+  Tmax:      [3000.0, 5000.0] # N
+  wind_mag:  [0.0, 15.0]      # m/s (constant wind proxy)
+
+constraints:
+  qmax: 40000.0
+  nmax: 5.0
+
+scaling: use_scales_yaml   # reference to configs/scales.yaml
+
+ocp:
+  kkt_tol: 1e-6
+  max_iter: 3000
+  mesh_points: 61
+  warm_start: true

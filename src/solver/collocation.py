@@ -7,7 +7,7 @@ OCP to discrete NLP.
 
 import casadi as ca
 import numpy as np
-from typing import Callable, Tuple, Dict
+from typing import Callable, Tuple, Dict, NamedTuple, Any
 
 
 def hermite_simpson_collocation(
@@ -180,4 +180,49 @@ def compute_collocation_defects(
         defects.append(defect)
     
     return ca.horzcat(*defects) if defects else ca.MX.zeros(nx, N)
+
+
+class SolveResult(NamedTuple):
+    """Result from OCP solve (WP2 contract)."""
+    success: bool
+    message: str
+    t_knots: np.ndarray  # [K]
+    x_knots: np.ndarray  # [K, 14]
+    u_knots: np.ndarray  # [Kc, 4] - [T, uTx, uTy, uTz] with ||uT||=1
+    x0: np.ndarray  # [14] - initial state in SI
+    tf: float  # final time (s)
+    control_cb: Callable[[float, np.ndarray], np.ndarray]  # (t, x) -> [T, uTx, uTy, uTz] in SI
+    stats: Dict[str, Any]  # {"kkt": float, "n_iter": int, "solve_time_s": float}
+    meta: Dict[str, Any]  # config hash, seed, etc.
+
+
+def solve_ocp(
+    phys: Dict[str, Any],
+    limits: Dict[str, Any],
+    ocp_cfg: Dict[str, Any],
+    scales: Dict[str, float]
+) -> SolveResult:
+    """
+    Solve the direct-collocation ascent OCP (6-DOF, wind, q-limit).
+    
+    Inputs are in SI; internally you may scale per `scales`.
+    Return knots, a callable control law (interpolates knots), stats, and tf.
+    
+    Args:
+        phys: Physical parameters (SI)
+        limits: Operational limits (SI)
+        ocp_cfg: OCP configuration dict
+        scales: Scaling factors (L, V, T, M, F, W)
+        
+    Returns:
+        SolveResult with all fields in SI
+        
+    Note: This is a stub. Implement the full OCP solve using transcription.py
+    and an NLP solver (IPOPT).
+    """
+    raise NotImplementedError(
+        "solve_ocp: Implement using DirectCollocation from transcription.py "
+        "and an NLP solver (e.g., IPOPT via CasADi). "
+        "Return SolveResult with SI values."
+    )
 

@@ -1,0 +1,84 @@
+# Makefile for WP3 (Dataset Generation & Preprocessing)
+#
+# Usage: make -f Makefile.wp3 <target>
+
+.PHONY: all validate_wp3 test plot clean help
+
+PYTHON := python3
+PYTEST := pytest
+
+# Directories
+PROJECT_ROOT := $(shell pwd)
+SCRIPTS_DIR := $(PROJECT_ROOT)/scripts
+TESTS_DIR := $(PROJECT_ROOT)/tests
+DATA_DIR := $(PROJECT_ROOT)/data
+REPORTS_DIR := $(PROJECT_ROOT)/reports
+FIGURES_DIR := $(PROJECT_ROOT)/docs/figures/wp3_quick_checks
+
+# Default target
+all: validate_wp3
+
+help:
+	@echo "WP3 Make Targets:"
+	@echo "  make validate_wp3       - Full WP3 pre-flight validation (smoke test + plots)"
+	@echo "  make validate_wp3_conda - Same as above, using Conda environment"
+	@echo "  make verify_wp3_final   - Final verification (all quality gates)"
+	@echo "  make test              - Run all WP3 tests"
+	@echo "  make plot              - Generate quick check plots"
+	@echo "  make clean             - Clean generated files"
+	@echo "  make all               - Run validate_wp3"
+
+# Full WP3 pre-flight validation (uses system Python)
+validate_wp3:
+	@echo "=== WP3 Pre-Flight Validation ==="
+	@chmod +x $(SCRIPTS_DIR)/validate_wp3.sh
+	@$(SCRIPTS_DIR)/validate_wp3.sh configs/dataset.yaml 12
+	@echo "Validation complete. Check reports/DATASET_CARD.json and $(FIGURES_DIR)/"
+
+# Full WP3 pre-flight validation (uses Conda environment)
+validate_wp3_conda:
+	@echo "=== WP3 Pre-Flight Validation (Conda) ==="
+	@chmod +x $(SCRIPTS_DIR)/validate_wp3_conda.sh
+	@$(SCRIPTS_DIR)/validate_wp3_conda.sh configs/dataset.yaml 12
+	@echo "Validation complete. Check reports/DATASET_CARD.json and $(FIGURES_DIR)/"
+
+# Final WP3 verification (all quality gates)
+verify_wp3_final:
+	@echo "=== WP3 Final Verification ==="
+	@export PYTHONPATH="$$PYTHONPATH:$$(pwd)" && $(PYTHON) $(SCRIPTS_DIR)/verify_wp3_final.py data/raw data/processed
+
+# Run all WP3 tests
+test:
+	@echo "Running WP3 tests..."
+	@export PYTHONPATH="$$PYTHONPATH:$$(pwd)" && $(PYTEST) -k "dataset or generator or preprocess or schema or constraints or scaling or split or control or processed or mass" -v --tb=short
+
+# Generate quick check plots
+plot:
+	@echo "Generating quick check plots..."
+	@mkdir -p $(FIGURES_DIR)
+	$(PYTHON) $(SCRIPTS_DIR)/plot_quick_checks.py \
+	          --raw $(DATA_DIR)/raw \
+	          --processed $(DATA_DIR)/processed \
+	          --output $(FIGURES_DIR) \
+	          --n-cases 3
+
+# Clean generated files
+clean:
+	@echo "Cleaning WP3 generated files..."
+	rm -rf $(DATA_DIR)/raw/*.h5
+	rm -rf $(DATA_DIR)/raw/*.npz
+	rm -rf $(DATA_DIR)/raw/failures.jsonl
+	rm -rf $(DATA_DIR)/raw/samples.jsonl
+	rm -rf $(DATA_DIR)/processed/*.h5
+	rm -rf $(DATA_DIR)/processed/splits.json
+	rm -rf $(REPORTS_DIR)/DATASET_CARD.json
+	rm -rf $(REPORTS_DIR)/wp3_stats.json
+	rm -rf $(FIGURES_DIR)/*.png
+	rm -rf configs/dataset_smoke.yaml
+
+# Ensure directories exist
+$(DATA_DIR)/raw $(DATA_DIR)/processed $(REPORTS_DIR) $(FIGURES_DIR):
+	mkdir -p $@
+
+validate_wp3 plot: $(DATA_DIR)/raw $(DATA_DIR)/processed $(REPORTS_DIR) $(FIGURES_DIR)
+
