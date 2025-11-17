@@ -1,5 +1,5 @@
 #!/bin/bash
-# Training script for PINN model
+# Training script for Residual Network model
 
 set -e
 
@@ -41,31 +41,28 @@ done
 
 # Merge configs if needed
 if [ -z "$CONFIG" ]; then
-    # Create merged config in temporary file to avoid git tracking issues
-    CONFIG=$(mktemp --suffix=.yaml)
+    CONFIG="${CONFIG_DIR}/residual_config.yaml"
     python -c "
 import yaml
-from pathlib import Path
 
-# Load base configs
 with open('${CONFIG_DIR}/model.yaml', 'r') as f:
     model_cfg = yaml.safe_load(f)
 with open('${CONFIG_DIR}/train.yaml', 'r') as f:
     train_cfg = yaml.safe_load(f)
 
-# Merge
+# Set model type to residual
+model_cfg['model']['type'] = 'residual'
+train_cfg['train']['experiment_name'] = 'residual_baseline'
+
 merged = {**model_cfg, **train_cfg}
 
-# Save to temporary file
 with open('${CONFIG}', 'w') as f:
     yaml.dump(merged, f)
 "
-    # Cleanup temp file after training (trap ensures cleanup even on error)
-    trap "rm -f ${CONFIG}" EXIT
 fi
 
 # Run training
-python -m src.train.train_pinn \
+python -m src.train.train_residual \
     --config "$CONFIG" \
     --data_dir "$DATA_DIR" \
     --experiment_dir "$EXPERIMENT_DIR" \
@@ -73,3 +70,4 @@ python -m src.train.train_pinn \
     ${RESUME:+--resume "$RESUME"}
 
 echo "Training complete!"
+

@@ -8,6 +8,9 @@ import platform
 from pathlib import Path
 from datetime import datetime
 import json
+import random
+import numpy as np
+import torch
 
 
 def get_git_hash(project_root=None):
@@ -151,4 +154,22 @@ def print_reproducibility_info(project_root=None, seed=None):
     
     if seed is not None:
         print(f"  Random seed: {seed}")
+
+
+def set_seed(seed: int):
+    """
+    Set random seed for reproducibility.
+    
+    Args:
+        seed: Random seed value
+    """
+    random.seed(seed)
+    np.random.seed(seed)
+    torch.manual_seed(seed)
+    if torch.cuda.is_available():
+        torch.cuda.manual_seed(seed)
+        torch.cuda.manual_seed_all(seed)
+    # Ensure deterministic behavior (may reduce performance)
+    torch.backends.cudnn.deterministic = True
+    torch.backends.cudnn.benchmark = False
 

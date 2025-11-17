@@ -1,0 +1,12 @@
+# Model architecture configuration for PINN
+
+model:
+  type: pinn           # pinn | residual
+  n_hidden: 6          # Number of hidden layers
+  n_neurons: 128       # Neurons per hidden layer
+  activation: tanh      # tanh | relu | gelu | swish
+  fourier_features: 8  # Number of Fourier frequencies for time embedding
+  layer_norm: true      # Use layer normalization
+  dropout: 0.05         # Dropout rate (0.0 = no dropout)
+  context_embedding_dim: 16  # Dimension of context embedding
+

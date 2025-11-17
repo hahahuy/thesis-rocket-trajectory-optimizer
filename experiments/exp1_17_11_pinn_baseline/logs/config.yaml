@@ -1,0 +1,23 @@
+loss:
+  homotopy_schedule: linear
+  lambda_bc: 1.0
+  lambda_data: 1.0
+  lambda_phys: 0.1
+  lambda_phys_final: 1.0
+physics_config: configs/phys.yaml
+scales_config: configs/scales.yaml
+train:
+  batch_size: 8
+  early_stopping_min_delta: 0.0
+  early_stopping_patience: 10
+  epochs: 100
+  experiment_name: pinn_baseline
+  learning_rate: 1e-3
+  num_workers: 0
+  scheduler:
+    kwargs:
+      T_max: 100
+      eta_min: 1e-6
+    type: cosine
+  time_subsample: null
+  weight_decay: 1e-5
