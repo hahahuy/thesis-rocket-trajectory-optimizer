@@ -238,9 +238,10 @@ def main():
     with open(logs_dir / "config.yaml", "w") as f:
         yaml.dump(config, f)
     
-    # Device
-    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-    print(f"Using device: {device}")
+    # Device - Force CPU for testing
+    # [PINN_V2][2025-01-XX][Temporary] Force CPU for testing
+    device = torch.device("cpu")
+    print(f"Using device: {device} (forced CPU for testing)")
     
     # Load physics parameters
     phys_path = config.get("physics_config", "configs/phys.yaml")
@@ -284,16 +285,37 @@ def main():
     # Get context dimension from dataset
     context_dim = train_loader.dataset.context_dim
     
-    # Create model
-    model = PINN(
-        context_dim=context_dim,
-        n_hidden=int(model_cfg.get("n_hidden", 6)),
-        n_neurons=int(model_cfg.get("n_neurons", 128)),
-        activation=model_cfg.get("activation", "tanh"),
-        fourier_features=int(model_cfg.get("fourier_features", 8)),
-        layer_norm=bool(model_cfg.get("layer_norm", True)),
-        dropout=safe_float(model_cfg.get("dropout"), 0.05)
-    ).to(device)
+    # [PINN_V2][2025-01-XX][Direction A]
+    # Create model based on model_type configuration
+    model_type = model_cfg.get("type", "pinn")
+    
+    if model_type == "pinn":
+        model = PINN(
+            context_dim=context_dim,
+            n_hidden=int(model_cfg.get("n_hidden", 6)),
+            n_neurons=int(model_cfg.get("n_neurons", 128)),
+            activation=model_cfg.get("activation", "tanh"),
+            fourier_features=int(model_cfg.get("fourier_features", 8)),
+            layer_norm=bool(model_cfg.get("layer_norm", True)),
+            dropout=safe_float(model_cfg.get("dropout"), 0.05)
+        ).to(device)
+    elif model_type == "latent_ode":
+        from src.models.latent_ode import RocketLatentODEPINN
+        model = RocketLatentODEPINN(
+            context_dim=context_dim,
+            latent_dim=int(model_cfg.get("latent_dim", 64)),
+            context_embedding_dim=int(model_cfg.get("context_embedding_dim", 64)),
+            fourier_features=int(model_cfg.get("fourier_features", 8)),
+            dynamics_n_hidden=int(model_cfg.get("dynamics_n_hidden", 3)),
+            dynamics_n_neurons=int(model_cfg.get("dynamics_n_neurons", 128)),
+            decoder_n_hidden=int(model_cfg.get("decoder_n_hidden", 3)),
+            decoder_n_neurons=int(model_cfg.get("decoder_n_neurons", 128)),
+            activation=model_cfg.get("activation", "tanh"),
+            layer_norm=bool(model_cfg.get("layer_norm", True)),
+            dropout=safe_float(model_cfg.get("dropout"), 0.05)
+        ).to(device)
+    else:
+        raise ValueError(f"Unknown model type: {model_type}. Supported: 'pinn', 'latent_ode'")
     
     print(f"Model parameters: {sum(p.numel() for p in model.parameters()):,}")
     

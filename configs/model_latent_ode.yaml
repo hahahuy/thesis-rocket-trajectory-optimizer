@@ -1,0 +1,16 @@
+# Model architecture configuration for PINN - Direction A: Latent ODE
+# [PINN_V2][2025-01-XX][Direction A]
+
+model:
+  type: latent_ode      # Use latent neural ODE architecture
+  latent_dim: 64        # Dimension of latent state z
+  context_embedding_dim: 64  # Dimension of context embedding
+  fourier_features: 8   # Number of Fourier frequencies for time embedding
+  dynamics_n_hidden: 3  # Number of hidden layers in latent dynamics network
+  dynamics_n_neurons: 128  # Neurons per hidden layer in dynamics network
+  decoder_n_hidden: 3   # Number of hidden layers in decoder
+  decoder_n_neurons: 128  # Neurons per hidden layer in decoder
+  activation: tanh      # tanh | relu | gelu | swish
+  layer_norm: true      # Use layer normalization
+  dropout: 0.05         # Dropout rate (0.0 = no dropout)
+

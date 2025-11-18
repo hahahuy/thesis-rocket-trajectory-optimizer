@@ -1,0 +1,48 @@
+# Complete training configuration for PINN - Direction A: Latent ODE
+# [PINN_V2][2025-01-XX][Direction A]
+
+model:
+  type: latent_ode      # Use latent neural ODE architecture
+  latent_dim: 64        # Dimension of latent state z
+  context_embedding_dim: 64  # Dimension of context embedding
+  fourier_features: 8   # Number of Fourier frequencies for time embedding
+  dynamics_n_hidden: 3  # Number of hidden layers in latent dynamics network
+  dynamics_n_neurons: 128  # Neurons per hidden layer in dynamics network
+  decoder_n_hidden: 3   # Number of hidden layers in decoder
+  decoder_n_neurons: 128  # Neurons per hidden layer in decoder
+  activation: tanh      # tanh | relu | gelu | swish
+  layer_norm: true      # Use layer normalization
+  dropout: 0.05         # Dropout rate (0.0 = no dropout)
+
+train:
+  experiment_name: latent_ode_test
+  batch_size: 4         # Smaller batch for CPU testing
+  num_workers: 0
+  epochs: 10            # Fewer epochs for testing
+  learning_rate: 1e-3
+  weight_decay: 1e-5
+  time_subsample: null  # Subsample time points (null = all)
+  
+  # Early stopping
+  early_stopping_patience: 10
+  early_stopping_min_delta: 0.0
+  
+  # Learning rate scheduler
+  scheduler:
+    type: cosine  # cosine | plateau | step | exponential
+    kwargs:
+      T_max: 10
+      eta_min: 1e-6
+
+# Loss configuration
+loss:
+  lambda_data: 1.0
+  lambda_phys: 0.1
+  lambda_bc: 1.0
+  lambda_phys_final: 1.0  # Final physics weight (for homotopy)
+  homotopy_schedule: fixed  # fixed for initial testing
+
+# Physics and scaling configs
+physics_config: configs/phys.yaml
+scales_config: configs/scales.yaml
+

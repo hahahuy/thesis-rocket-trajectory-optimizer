@@ -1,12 +1,15 @@
 # Model architecture configuration for PINN
 
 model:
-  type: pinn           # pinn | residual
-  n_hidden: 6          # Number of hidden layers
-  n_neurons: 128       # Neurons per hidden layer
+  type: pinn           # pinn | residual | latent_ode
+  n_hidden: 6          # Number of hidden layers (for pinn/residual)
+  n_neurons: 128       # Neurons per hidden layer (for pinn/residual)
   activation: tanh      # tanh | relu | gelu | swish
   fourier_features: 8  # Number of Fourier frequencies for time embedding
   layer_norm: true      # Use layer normalization
   dropout: 0.05         # Dropout rate (0.0 = no dropout)
-  context_embedding_dim: 16  # Dimension of context embedding
+  context_embedding_dim: 16  # Dimension of context embedding (for pinn/residual)
+  
+  # For latent_ode type, see configs/model_latent_ode.yaml for full configuration
+  # Key parameters: latent_dim, dynamics_n_hidden, dynamics_n_neurons, decoder_n_hidden, decoder_n_neurons
 
