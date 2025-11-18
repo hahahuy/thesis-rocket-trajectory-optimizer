@@ -314,8 +314,47 @@ def main():
             layer_norm=bool(model_cfg.get("layer_norm", True)),
             dropout=safe_float(model_cfg.get("dropout"), 0.05)
         ).to(device)
+    elif model_type == "sequence":
+        from src.models.sequence_pinn import RocketSequencePINN
+
+        model = RocketSequencePINN(
+            context_dim=context_dim,
+            context_embedding_dim=int(model_cfg.get("context_embedding_dim", 64)),
+            fourier_features=int(model_cfg.get("fourier_features", 8)),
+            d_model=int(model_cfg.get("d_model", 128)),
+            n_layers=int(model_cfg.get("n_layers", 4)),
+            n_heads=int(model_cfg.get("n_heads", 4)),
+            dim_feedforward=int(model_cfg.get("dim_feedforward", 512)),
+            dropout=safe_float(model_cfg.get("dropout"), 0.05),
+            activation=model_cfg.get("transformer_activation", "gelu"),
+        ).to(device)
+    elif model_type == "hybrid":
+        from src.models.hybrid_pinn import RocketHybridPINN
+
+        model = RocketHybridPINN(
+            context_dim=context_dim,
+            latent_dim=int(model_cfg.get("latent_dim", 64)),
+            context_embedding_dim=int(model_cfg.get("context_embedding_dim", 64)),
+            fourier_features=int(model_cfg.get("fourier_features", 8)),
+            d_model=int(model_cfg.get("d_model", 128)),
+            n_layers=int(model_cfg.get("n_layers", 2)),
+            n_heads=int(model_cfg.get("n_heads", 4)),
+            dim_feedforward=int(model_cfg.get("dim_feedforward", 512)),
+            encoder_window=int(model_cfg.get("encoder_window", 10)),
+            activation=model_cfg.get("activation", "tanh"),
+            transformer_activation=model_cfg.get("transformer_activation", "gelu"),
+            dynamics_n_hidden=int(model_cfg.get("dynamics_n_hidden", 3)),
+            dynamics_n_neurons=int(model_cfg.get("dynamics_n_neurons", 128)),
+            decoder_n_hidden=int(model_cfg.get("decoder_n_hidden", 3)),
+            decoder_n_neurons=int(model_cfg.get("decoder_n_neurons", 128)),
+            layer_norm=bool(model_cfg.get("layer_norm", True)),
+            dropout=safe_float(model_cfg.get("dropout"), 0.05),
+        ).to(device)
     else:
-        raise ValueError(f"Unknown model type: {model_type}. Supported: 'pinn', 'latent_ode'")
+        raise ValueError(
+            "Unknown model type: "
+            f"{model_type}. Supported: 'pinn', 'latent_ode', 'sequence', 'hybrid'"
+        )
     
     print(f"Model parameters: {sum(p.numel() for p in model.parameters()):,}")
     

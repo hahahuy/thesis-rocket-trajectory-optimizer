@@ -76,3 +76,49 @@ model:
 
 ---
 
+## [2025-11-18] Direction B – Sequence Transformer PINN
+
+### Added Files
+- **`src/models/sequence_pinn.py`**
+  - New class `RocketSequencePINN` implementing the Transformer-based sequence architecture.
+- **`configs/model_B_sequence.yaml`**
+  - Defines model hyperparameters for the sequence Transformer.
+- **`configs/train_sequence.yaml`**
+  - Provides a smoke-test training configuration for Direction B.
+
+### Modified Files
+- **`src/models/__init__.py`**
+  - Exported `RocketSequencePINN`.
+- **`src/train/train_pinn.py`**
+  - Added `model_type: sequence` branch to instantiate the new architecture.
+
+### Notes
+- Sequence model treats the entire time grid jointly to capture temporal correlations.
+- Uses Fourier time embeddings, context encoder, Transformer encoder, and MLP head.
+- Training config uses small batch/epoch counts for quick regression tests; upscale for full runs.
+
+---
+
+## [2025-11-18] Direction C – Hybrid Sequence + Latent ODE PINN
+
+### Added Files
+- **`src/models/hybrid_pinn.py`**
+  - New class `RocketHybridPINN` combining a Transformer encoder for `z0` with latent ODE dynamics.
+- **`configs/model_C_hybrid.yaml`**
+  - Captures default hyperparameters for Direction C.
+- **`configs/train_hybrid.yaml`**
+  - Smoke-test training configuration for the hybrid model.
+
+### Modified Files
+- **`src/models/__init__.py`**
+  - Exported `RocketHybridPINN`.
+- **`src/train/train_pinn.py`**
+  - Added `model_type: hybrid` instantiation branch.
+
+### Notes
+- Transformer encoder uses the first `encoder_window` timesteps to estimate the latent initial state.
+- Latent ODE solver reuses Direction A components for dynamics integration.
+- Decoder mirrors Direction A to ensure consistent `[batch, N, 14]` outputs and compatibility with existing losses.
+
+---
+

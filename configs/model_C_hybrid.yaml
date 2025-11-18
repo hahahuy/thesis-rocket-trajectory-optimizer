@@ -1,0 +1,23 @@
+# Model configuration for PINN Direction C – Hybrid sequence + latent ODE
+# [PINN_V2][2025-11-18][Direction C]
+
+model:
+  type: hybrid
+  latent_dim: 64
+  context_embedding_dim: 64
+  fourier_features: 8
+  d_model: 128
+  n_layers: 2
+  n_heads: 4
+  dim_feedforward: 512
+  encoder_window: 10
+  activation: tanh
+  transformer_activation: gelu
+  dynamics_n_hidden: 3
+  dynamics_n_neurons: 128
+  decoder_n_hidden: 3
+  decoder_n_neurons: 128
+  layer_norm: true
+  dropout: 0.05
+
+
