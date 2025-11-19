@@ -220,11 +220,12 @@ with torch.no_grad():
             t = t.unsqueeze(-1)
 
         state_pred = model(t, context)
-
-        t_np = t[0].cpu().squeeze(-1).numpy()
-        pred_np = state_pred[0].cpu().numpy()
-        true_np = state_true[0].cpu().numpy()
-
+        
+        # Convert to numpy (detach to remove gradient tracking)
+        t_np = t[0].cpu().detach().squeeze(-1).numpy()
+        pred_np = state_pred[0].cpu().detach().numpy()
+        true_np = state_true[0].cpu().detach().numpy()
+        
         plot_trajectory_comparison(
             t_np, pred_np, true_np, scales,
             save_path=str(output_dir / f'trajectory_case_{i}.png'),

@@ -16,9 +16,9 @@ model:
 
 train:
   experiment_name: latent_ode_test
-  batch_size: 4         # Smaller batch for CPU testing
+  batch_size: 16         # Smaller batch for CPU testing
   num_workers: 0
-  epochs: 10            # Fewer epochs for testing
+  epochs: 100            # Fewer epochs for testing
   learning_rate: 1e-3
   weight_decay: 1e-5
   time_subsample: null  # Subsample time points (null = all)

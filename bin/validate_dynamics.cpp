@@ -1,3 +1,4 @@
+#define _USE_MATH_DEFINES  // Enable M_PI on MSVC
 #include <iostream>
 #include <iomanip>
 #include <fstream>

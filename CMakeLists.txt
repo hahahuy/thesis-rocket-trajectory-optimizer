@@ -7,17 +7,28 @@ set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 
 # Find required packages
 find_package(Eigen3 REQUIRED)
-find_package(PkgConfig REQUIRED)
 
-# Find Google Test
+# PkgConfig is required on Linux/Unix, optional on Windows
+if(UNIX AND NOT APPLE)
+    find_package(PkgConfig REQUIRED)
+else()
+    find_package(PkgConfig)
+endif()
+
 find_package(GTest REQUIRED)
 
 # Include directories
 include_directories(${CMAKE_SOURCE_DIR}/src)
 include_directories(${EIGEN3_INCLUDE_DIR})
 
-# Compiler flags
-set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wall -Wextra -O2")
+# Compiler flags (platform-specific)
+if(MSVC)
+    # MSVC flags
+    add_compile_options(/W4 /O2)
+else()
+    # GCC/Clang flags
+    add_compile_options(-Wall -Wextra -O2)
+endif()
 
 # Add executable for types demo
 add_executable(types_demo bin/run_types_demo.cpp)
