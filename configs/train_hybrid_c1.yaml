@@ -1,0 +1,50 @@
+## Training configuration for Direction C1 hybrid model
+# [PINN_V2][2025-11-19][Direction C1]
+
+model:
+  type: hybrid_c1
+  latent_dim: 64
+  context_embedding_dim: 32
+  fourier_features: 8
+  d_model: 128
+  n_layers: 2
+  n_heads: 4
+  dim_feedforward: 512
+  encoder_window: 10
+  activation: tanh
+  transformer_activation: gelu
+  dynamics_n_hidden: 3
+  dynamics_n_neurons: 128
+  decoder_n_hidden: 3
+  decoder_n_neurons: 128
+  layer_norm: true
+  dropout: 0.05
+  debug_stats: true
+
+train:
+  experiment_name: hybrid_c1_full
+  batch_size: 4
+  num_workers: 0
+  epochs: 100
+  learning_rate: 1e-3
+  weight_decay: 1e-5
+  time_subsample: null
+  scheduler:
+    type: cosine
+    kwargs:
+      T_max: 100
+      eta_min: 1e-6
+  early_stopping_patience: 10
+  early_stopping_min_delta: 0.0
+
+loss:
+  lambda_data: 1.0
+  lambda_phys: 0.1
+  lambda_bc: 1.0
+  lambda_phys_final: 1.0
+  homotopy_schedule: fixed
+
+physics_config: configs/phys.yaml
+scales_config: configs/scales.yaml
+
+

@@ -122,3 +122,33 @@ model:
 
 ---
 
+## [2025-11-19] Direction C1 – Hybrid Stability + Context Upgrades
+
+### Added / Modified Files
+- **`src/models/architectures.py`**
+  - Added `DeepContextEncoder`, `OutputHeads`, and `normalize_quaternion`.
+- **`src/models/hybrid_pinn.py`**
+  - Added `RocketHybridPINNC1` implementing split heads, quaternion normalization, Δ-state decoding, and debugging hooks.
+- **`src/models/__init__.py`**
+  - Exported the new architecture helpers and `RocketHybridPINNC1`.
+- **`src/train/train_pinn.py`**
+  - Added helper to pass true `s0` into models that require Δ-state decoding.
+  - Registered `model.type: hybrid_c1`.
+- **`src/eval/visualize_pinn.py`**, **`run_evaluation.py`**
+  - Forward helpers updated to pass initial states and aggregate new diagnostics/metrics.
+- **Configs**
+  - Added `configs/model_C1_hybrid.yaml` and `configs/train_hybrid_c1.yaml`.
+
+### Highlights
+- Output head split for translation / rotation / mass plus quaternion normalization.
+- Decoder now predicts Δ-state and re-adds `s0` for stability.
+- Deep context encoder (64→128→128→64→32 with GELU + LayerNorm) shared across Transformer + dynamics.
+- Evaluation logs:
+  - Quaternion norms (pre/post normalization)
+  - Mass monotonicity violations
+  - Δ-state magnitude stats
+  - Translation vs rotation RMSE aggregates
+- Backward compatible with Direction A/B/C configs; select `model.type: hybrid_c1` for the enhanced variant.
+
+---
+

@@ -34,6 +34,17 @@ def safe_float(value, default=None):
         return default
 
 
+def _requires_initial_state(model) -> bool:
+    return bool(getattr(model, "requires_initial_state", False))
+
+
+def _forward_with_initial_state_if_needed(model, t, context, state_true):
+    if _requires_initial_state(model):
+        initial_state = state_true[:, 0, :]
+        return model(t, context, initial_state)
+    return model(t, context)
+
+
 def create_model(model_cfg, context_dim):
     model_type = model_cfg.get("type", "pinn").lower()
 
@@ -114,6 +125,30 @@ def create_model(model_cfg, context_dim):
             decoder_n_neurons=safe_int(model_cfg.get("decoder_n_neurons", 128)),
             layer_norm=bool(model_cfg.get("layer_norm", True)),
             dropout=safe_float(model_cfg.get("dropout"), 0.05),
+        )
+
+    if model_type == "hybrid_c1":
+        from src.models.hybrid_pinn import RocketHybridPINNC1
+
+        return RocketHybridPINNC1(
+            context_dim=context_dim,
+            latent_dim=safe_int(model_cfg.get("latent_dim", 64)),
+            context_embedding_dim=safe_int(model_cfg.get("context_embedding_dim", 32)),
+            fourier_features=safe_int(model_cfg.get("fourier_features", 8)),
+            d_model=safe_int(model_cfg.get("d_model", 128)),
+            n_layers=safe_int(model_cfg.get("n_layers", 2)),
+            n_heads=safe_int(model_cfg.get("n_heads", 4)),
+            dim_feedforward=safe_int(model_cfg.get("dim_feedforward", 512)),
+            encoder_window=safe_int(model_cfg.get("encoder_window", 10)),
+            activation=model_cfg.get("activation", "tanh"),
+            transformer_activation=model_cfg.get("transformer_activation", "gelu"),
+            dynamics_n_hidden=safe_int(model_cfg.get("dynamics_n_hidden", 3)),
+            dynamics_n_neurons=safe_int(model_cfg.get("dynamics_n_neurons", 128)),
+            decoder_n_hidden=safe_int(model_cfg.get("decoder_n_hidden", 3)),
+            decoder_n_neurons=safe_int(model_cfg.get("decoder_n_neurons", 128)),
+            layer_norm=bool(model_cfg.get("layer_norm", True)),
+            dropout=safe_float(model_cfg.get("dropout"), 0.05),
+            debug_stats=bool(model_cfg.get("debug_stats", True)),
         )
 
     raise ValueError(
@@ -293,7 +328,9 @@ def main():
                         if t.dim() == 2:
                             t = t.unsqueeze(-1)
 
-                        state_pred = model(t, context)
+                        state_pred = _forward_with_initial_state_if_needed(
+                            model, t, context, state_true
+                        )
 
                         t_np = t[0].cpu().detach().squeeze(-1).numpy()
                         pred_np = state_pred[0].cpu().detach().numpy()

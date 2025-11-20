@@ -441,6 +441,57 @@ def plot_loss_curves(
     plt.close()
 
 
+def _requires_initial_state(model: torch.nn.Module) -> bool:
+    return bool(getattr(model, "requires_initial_state", False))
+
+
+def _forward_with_initial_state_if_needed(
+    model: torch.nn.Module,
+    t: torch.Tensor,
+    context: torch.Tensor,
+    state_true: torch.Tensor,
+) -> torch.Tensor:
+    if _requires_initial_state(model):
+        initial_state = state_true[:, 0, :]
+        return model(t, context, initial_state)
+    return model(t, context)
+
+
+def _aggregate_debug_records(records):
+    if not records:
+        return {}
+
+    aggregated = {}
+    total_weight = 0.0
+
+    for record in records:
+        weight = float(record.get("batch_size", 1))
+        total_weight += weight
+        for key, value in record.items():
+            if key == "batch_size":
+                continue
+            if isinstance(value, dict):
+                dest = aggregated.setdefault(key, {})
+                for sub_key, sub_val in value.items():
+                    dest[sub_key] = dest.get(sub_key, 0.0) + sub_val * weight
+            elif key.endswith("_max"):
+                aggregated[key] = (
+                    max(aggregated.get(key, value), value) if key in aggregated else value
+                )
+            else:
+                aggregated[key] = aggregated.get(key, 0.0) + value * weight
+
+    if total_weight > 0:
+        for key, value in aggregated.items():
+            if isinstance(value, dict):
+                for sub_key in value:
+                    value[sub_key] /= total_weight
+            elif not key.endswith("_max"):
+                aggregated[key] /= total_weight
+
+    return aggregated
+
+
 def evaluate_model(
     model: torch.nn.Module,
     test_loader,
@@ -463,6 +514,7 @@ def evaluate_model(
     
     all_pred = []
     all_true = []
+    debug_records = []
     
     with torch.no_grad():
         for batch in test_loader:
@@ -473,7 +525,12 @@ def evaluate_model(
             if t.dim() == 2:
                 t = t.unsqueeze(-1)
             
-            state_pred = model(t, context)
+            state_pred = _forward_with_initial_state_if_needed(model, t, context, state_true)
+            if hasattr(model, "get_debug_stats"):
+                stats = model.get_debug_stats()
+                if stats:
+                    stats["batch_size"] = t.shape[0]
+                    debug_records.append(stats)
             
             all_pred.append(state_pred.cpu().numpy())
             all_true.append(state_true.cpu().numpy())
@@ -498,6 +555,32 @@ def evaluate_model(
         "rmse_total": float(rmse_total),
         "rmse_per_component": {name: float(rmse[i]) for i, name in enumerate(state_names)}
     }
-    
+
+    # Aggregated translation / rotation / mass RMSE
+    metrics["rmse_translation"] = float(
+        np.sqrt(np.mean((pred[:, :, :6] - true[:, :, :6]) ** 2))
+    )
+    metrics["rmse_rotation"] = float(
+        np.sqrt(np.mean((pred[:, :, 6:13] - true[:, :, 6:13]) ** 2))
+    )
+    metrics["rmse_mass"] = float(
+        np.sqrt(np.mean((pred[:, :, 13] - true[:, :, 13]) ** 2))
+    )
+
+    # Δ-state magnitude diagnostics
+    delta_pred = pred - pred[:, :1, :]
+    delta_norm = np.linalg.norm(delta_pred, axis=-1)
+    metrics["delta_state_norm_mean"] = float(delta_norm.mean())
+    metrics["delta_state_norm_max"] = float(delta_norm.max())
+
+    # Quaternion norm after normalization
+    quat_norm = np.linalg.norm(pred[:, :, 6:10], axis=-1)
+    metrics["quat_norm_mean_after"] = float(quat_norm.mean())
+    metrics["quat_norm_std_after"] = float(quat_norm.std())
+
+    debug_summary = _aggregate_debug_records(debug_records)
+    if debug_summary:
+        metrics["debug_stats"] = debug_summary
+
     return metrics
 

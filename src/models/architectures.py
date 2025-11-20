@@ -6,7 +6,7 @@ Provides MLP blocks, Fourier feature embeddings, and layer normalization utiliti
 
 import torch
 import torch.nn as nn
-from typing import Optional
+from typing import Optional, Sequence
 
 
 class MLPBlock(nn.Module):
@@ -174,4 +174,64 @@ class ContextEncoder(nn.Module):
             embedding: [..., embedding_dim]
         """
         return self.encoder(context)
+
+
+class DeepContextEncoder(nn.Module):
+    """
+    Deeper context encoder with multiple layers, GELU activations, and LayerNorm.
+    
+    Default shape: context_dim → 64 → 128 → 128 → 64 → 32
+    """
+
+    def __init__(
+        self,
+        context_dim: int,
+        hidden_dims: Sequence[int] = (64, 128, 128, 64),
+        output_dim: int = 32,
+    ) -> None:
+        super().__init__()
+
+        layers = []
+        in_dim = context_dim
+        for idx, dim in enumerate(hidden_dims):
+            layers.append(nn.Linear(in_dim, dim))
+            layers.append(nn.GELU())
+            # LayerNorm on early layers for stability (match spec)
+            if idx < 2:
+                layers.append(nn.LayerNorm(dim))
+            in_dim = dim
+
+        layers.append(nn.Linear(in_dim, output_dim))
+
+        self.net = nn.Sequential(*layers)
+
+    def forward(self, context: torch.Tensor) -> torch.Tensor:
+        return self.net(context)
+
+
+class OutputHeads(nn.Module):
+    """
+    Split output heads for translation, rotation, and mass predictions.
+    """
+
+    def __init__(self, in_dim: int) -> None:
+        super().__init__()
+        self.translation_head = nn.Linear(in_dim, 6)
+        self.rotation_head = nn.Linear(in_dim, 7)
+        self.mass_head = nn.Linear(in_dim, 1)
+
+    def forward(self, x: torch.Tensor):
+        translation = self.translation_head(x)
+        rotation = self.rotation_head(x)
+        mass = self.mass_head(x)
+        return translation, rotation, mass
+
+
+def normalize_quaternion(q: torch.Tensor, eps: float = 1e-8) -> torch.Tensor:
+    """
+    Normalize quaternion to unit length with numerical stability.
+    """
+
+    norm = torch.linalg.norm(q, dim=-1, keepdim=True).clamp_min(eps)
+    return q / norm
 

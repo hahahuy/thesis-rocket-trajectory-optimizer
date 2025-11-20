@@ -48,6 +48,22 @@ def safe_float(value, default=None):
     return default
 
 
+def _requires_initial_state(model: nn.Module) -> bool:
+    return bool(getattr(model, "requires_initial_state", False))
+
+
+def _forward_with_initial_state_if_needed(
+    model: nn.Module,
+    t: torch.Tensor,
+    context: torch.Tensor,
+    state_true: torch.Tensor,
+) -> torch.Tensor:
+    if _requires_initial_state(model):
+        initial_state = state_true[:, 0, :]
+        return model(t, context, initial_state)
+    return model(t, context)
+
+
 def _sanitize_experiment_desc(description: str) -> str:
     """Normalize the experiment description for filesystem safety."""
     if not description:
@@ -135,7 +151,7 @@ def train_epoch(
         
         # Forward pass
         optimizer.zero_grad()
-        state_pred = model(t, context)  # [batch, N, 14]
+        state_pred = _forward_with_initial_state_if_needed(model, t, context, state_true)
         
         # Compute loss
         loss, loss_dict = loss_fn(state_pred, state_true, t)
@@ -181,7 +197,7 @@ def validate(
         if t.dim() == 2:
             t = t.unsqueeze(-1)
         
-        state_pred = model(t, context)
+        state_pred = _forward_with_initial_state_if_needed(model, t, context, state_true)
         loss, loss_dict = loss_fn(state_pred, state_true, t)
         
         total_loss += loss.item()
@@ -287,7 +303,7 @@ def main():
     
     # [PINN_V2][2025-01-XX][Direction A]
     # Create model based on model_type configuration
-    model_type = model_cfg.get("type", "pinn")
+    model_type = model_cfg.get("type", "pinn").lower()
     
     if model_type == "pinn":
         model = PINN(
@@ -349,6 +365,29 @@ def main():
             decoder_n_neurons=int(model_cfg.get("decoder_n_neurons", 128)),
             layer_norm=bool(model_cfg.get("layer_norm", True)),
             dropout=safe_float(model_cfg.get("dropout"), 0.05),
+        ).to(device)
+    elif model_type == "hybrid_c1":
+        from src.models.hybrid_pinn import RocketHybridPINNC1
+
+        model = RocketHybridPINNC1(
+            context_dim=context_dim,
+            latent_dim=int(model_cfg.get("latent_dim", 64)),
+            context_embedding_dim=int(model_cfg.get("context_embedding_dim", 32)),
+            fourier_features=int(model_cfg.get("fourier_features", 8)),
+            d_model=int(model_cfg.get("d_model", 128)),
+            n_layers=int(model_cfg.get("n_layers", 2)),
+            n_heads=int(model_cfg.get("n_heads", 4)),
+            dim_feedforward=int(model_cfg.get("dim_feedforward", 512)),
+            encoder_window=int(model_cfg.get("encoder_window", 10)),
+            activation=model_cfg.get("activation", "tanh"),
+            transformer_activation=model_cfg.get("transformer_activation", "gelu"),
+            dynamics_n_hidden=int(model_cfg.get("dynamics_n_hidden", 3)),
+            dynamics_n_neurons=int(model_cfg.get("dynamics_n_neurons", 128)),
+            decoder_n_hidden=int(model_cfg.get("decoder_n_hidden", 3)),
+            decoder_n_neurons=int(model_cfg.get("decoder_n_neurons", 128)),
+            layer_norm=bool(model_cfg.get("layer_norm", True)),
+            dropout=safe_float(model_cfg.get("dropout"), 0.05),
+            debug_stats=bool(model_cfg.get("debug_stats", True)),
         ).to(device)
     else:
         raise ValueError(
