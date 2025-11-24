@@ -1,0 +1,43 @@
+# Model architecture configuration for PINN - Direction C2: Shared Stem + Dedicated Branches
+# [PINN_V2][2025-11-19][C2 Architecture]
+
+model:
+  type: hybrid_c2  # Shared Stem + Dedicated Branches architecture
+  
+  # Latent ODE parameters
+  latent_dim: 64
+  fourier_features: 8
+  
+  # Shared Stem parameters
+  shared_stem_hidden_dim: 128  # Dimension of shared embedding
+  temporal_type: transformer   # transformer | tcn (future)
+  temporal_n_layers: 4          # Number of Transformer layers in shared stem
+  temporal_n_heads: 4           # Number of attention heads
+  temporal_dim_feedforward: 512 # Feedforward dimension in Transformer
+  
+  # Encoder window for z0 derivation
+  encoder_window: 10            # Number of initial timesteps used to derive z0
+  
+  # Dedicated Branch architectures
+  translation_branch_dims: [128, 128]  # Hidden dimensions for translation branch
+  rotation_branch_dims: [256, 256]     # Hidden dimensions for rotation branch (wider)
+  mass_branch_dims: [64]               # Hidden dimensions for mass branch (narrower)
+  
+  # Latent dynamics network
+  dynamics_n_hidden: 3
+  dynamics_n_neurons: 128
+  
+  # Activation functions
+  activation: tanh              # For latent dynamics
+  transformer_activation: gelu  # For Transformer layers
+  
+  # Regularization
+  layer_norm: true
+  dropout: 0.05
+  
+  # Debug
+  debug_stats: true
+
+
+
+

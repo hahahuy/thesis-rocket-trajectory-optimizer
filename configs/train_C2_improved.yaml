@@ -1,0 +1,120 @@
+# Improved training configuration for PINN - Direction C2 with enhanced loss
+# [PINN_V2][2025-11-21][C2 Architecture + Enhanced Loss]
+#
+# Based on metrics analysis from exp1-3:
+# - exp1 (PINN baseline): RMSE 0.84, good rotation (0.11) but high z/vz errors
+# - exp2 (Sequence): RMSE 0.86, excellent rotation (0.047) but translation issues
+# - exp3 (Hybrid C2): RMSE 0.96, rotation problems (0.38), quaternion norm issues
+#
+# Improvements:
+# 1. Component-weighted loss prioritizing z, vz, quaternions
+# 2. Quaternion normalization penalty to fix exp3's norm=1.08 issue
+# 3. Mass flow consistency to prevent mass increases
+# 4. Balanced translation/rotation/mass group weights
+
+model:
+  type: hybrid_c2  # Shared Stem + Dedicated Branches architecture
+  
+  # Latent ODE parameters
+  latent_dim: 64
+  fourier_features: 8
+  
+  # Shared Stem parameters
+  shared_stem_hidden_dim: 128
+  temporal_type: transformer
+  temporal_n_layers: 4
+  temporal_n_heads: 4
+  temporal_dim_feedforward: 512
+  encoder_window: 10
+  
+  # Dedicated Branch architectures
+  translation_branch_dims: [128, 128]
+  rotation_branch_dims: [256, 256]
+  mass_branch_dims: [64]
+  
+  # Latent dynamics network
+  dynamics_n_hidden: 3
+  dynamics_n_neurons: 128
+  
+  # Activation functions
+  activation: tanh
+  transformer_activation: gelu
+  
+  # Regularization
+  layer_norm: true
+  dropout: 0.05
+  debug_stats: true
+
+train:
+  experiment_name: hybrid_c2_improved
+  batch_size: 8
+  num_workers: 0
+  epochs: 100
+  learning_rate: 1e-3
+  weight_decay: 1e-5
+  time_subsample: null  # Full time grid
+  
+  # Early stopping
+  early_stopping_patience: 10
+  early_stopping_min_delta: 0.0
+  
+  # Learning rate scheduler
+  scheduler:
+    type: cosine
+    kwargs:
+      T_max: 100
+      eta_min: 1e-6
+
+# Enhanced loss configuration
+loss:
+  # Base loss weights
+  lambda_data: 1.0
+  lambda_phys: 0.1
+  lambda_bc: 1.0
+  lambda_phys_final: 1.0
+  homotopy_schedule: linear  # linear | exponential | fixed
+  
+  # Enhanced loss components
+  # Quaternion normalization penalty (fix exp3's norm=1.08 issue)
+  lambda_quat_norm: 0.1
+  
+  # Mass flow consistency (prevent mass increases)
+  lambda_mass_flow: 0.05
+  
+  # Group weights for translation/rotation/mass
+  # Based on metrics: translation errors are high, rotation needs help for C2
+  lambda_translation: 1.2  # Boost translation (z, vz are major error sources)
+  lambda_rotation: 1.5     # Boost rotation (exp3 had 0.38 rotation RMSE)
+  lambda_mass: 1.0         # Keep mass at baseline
+  
+  # Component weights: prioritize problematic components
+  # State order: [x, y, z, vx, vy, vz, q0, q1, q2, q3, wx, wy, wz, m]
+  component_weights:
+    # Position: z is the biggest error (0.91-1.03 RMSE across experiments)
+    x: 1.0
+    y: 1.0
+    z: 2.0  # 2x weight on altitude (major error source)
+    
+    # Velocity: vz is the biggest error (2.98-3.29 RMSE)
+    vx: 1.0
+    vy: 1.0
+    vz: 2.5  # 2.5x weight on vertical velocity (biggest error)
+    
+    # Quaternions: exp3 had high errors (0.41-0.70 RMSE)
+    q0: 1.5
+    q1: 1.5
+    q2: 1.5
+    q3: 1.5
+    
+    # Angular velocities: generally well-predicted, keep baseline
+    wx: 1.0
+    wy: 1.0
+    wz: 1.0
+    
+    # Mass: moderate errors (0.14-0.19 RMSE), keep baseline
+    m: 1.0
+
+# Physics and scaling configs
+physics_config: configs/phys.yaml
+scales_config: configs/scales.yaml
+

@@ -8,6 +8,8 @@
    - 3. [Direction B: Sequence Model (Transformer) PINN](#3-direction-b-sequence-model-transformer-pinn)
    - 4. [Direction C: Hybrid PINN](#4-direction-c-hybrid-pinn)
    - 5. [Direction C1: Enhanced Hybrid PINN](#5-direction-c1-enhanced-hybrid-pinn)
+   - 6. [Direction C2: Shared Stem + Dedicated Branches](#6-direction-c2-shared-stem--dedicated-branches)
+   - 7. [Direction D: Dependency-Aware Backbone + Causal Heads](#7-direction-d-dependency-aware-backbone--causal-heads)
 
 ---
 
@@ -1019,3 +1021,427 @@ Dataset (HDF5) → DataLoader
   - Can detect mass violations but no mechanism to prevent them
   - Statistics are diagnostic, not corrective
 - **Impact**: Better visibility into problems doesn't necessarily lead to better solutions.
+
+---
+
+## 6. Direction C2: Shared Stem + Dedicated Branches
+
+### 6.1 What Changed Compared to Direction C1
+
+**Key Architectural Changes:**
+
+#### 1. **Shared Stem Module** (Replaces Separate Processing)
+- **Direction C1**: Time embedding and context encoding processed separately, then concatenated before Transformer encoder window
+- **Direction C2**: New `SharedStem` module that:
+  - Processes time + context together through unified pipeline
+  - Applies temporal modeling (Transformer) to the **entire sequence** (not just encoder window)
+  - Produces shared embedding `[batch, N, hidden_dim]` that captures global physics patterns
+- **Purpose**: Learn unified temporal + context representation that all branches can leverage
+
+#### 2. **Dedicated Branches Architecture** (Replaces Split Output Heads)
+- **Direction C1**: Split output heads (TranslationHead, RotationHead, MassHead) that process decoder features independently
+- **Direction C2**: Three completely independent branch networks:
+  - **TranslationBranch**: Specialized MLP `[latent_dim → 128 → 128 → 6]` for `[x, y, z, vx, vy, vz]`
+  - **RotationBranch**: Specialized MLP `[latent_dim → 256 → 256 → 7]` for `[q0, q1, q2, q3, wx, wy, wz]`
+  - **MassBranch**: Specialized MLP `[latent_dim → 64 → 1]` for `[Δm]`
+- **Key Difference**: Branches receive **shared embedding from Latent ODE** (not decoder features), enabling them to learn from global physics representation
+
+#### 3. **Full-Sequence Temporal Modeling** (Replaces Window-Only Processing)
+- **Direction C1**: Transformer encoder processes only first 10 time steps (encoder window) to compute z0
+- **Direction C2**: Shared Stem processes **entire time sequence** (N=1501) through Transformer before deriving z0
+- **Impact**: All time steps contribute to shared representation, not just initial window
+
+#### 4. **Shared Embedding Flow**
+- **Direction C1**: Flow: `(t, context) → z0 → ODE → decoder → split heads`
+- **Direction C2**: Flow: `(t, context) → Shared Stem → shared_emb → z0 → ODE → z_traj → dedicated branches`
+- **Key Innovation**: Shared Stem learns global physics, then branches specialize on specific subsystems
+
+**Preserved Components:**
+- Same DeepContextEncoder (Set#2) - now part of Shared Stem
+- Same Latent ODE evolution (from Direction C)
+- Same quaternion normalization (Set#1)
+- Same Δ-state reconstruction (Set#1)
+- Same loss function structure
+- Same input/output interface: `(t, context, initial_state) → state`
+
+**Architecture Details:**
+- Shared Stem: Transformer encoder (4 layers, 4 heads, 128D hidden)
+- Shared embedding dimension: 128 (configurable)
+- Translation branch: 2 hidden layers (128 neurons each)
+- Rotation branch: 2 hidden layers (256 neurons each, wider for complexity)
+- Mass branch: 1 hidden layer (64 neurons, narrower for simplicity)
+- Encoder window: 10 time steps (for z0 derivation from shared embedding)
+
+### 6.2 Data Flow Diagram
+
+```
+Dataset (HDF5) → DataLoader
+    │
+    ├─ t: [batch, N, 1] ────────────────────┐
+    ├─ context: [batch, 7] ─────────────────┤
+    └─ initial_state: [batch, 14] ──────────┤
+                                              │
+                                              ▼
+                                    ┌──────────────────┐
+                                    │ Shared Stem      │
+                                    │                  │
+                                    │ 1. TimeEmbedding │
+                                    │    (Fourier)     │
+                                    │    → [batch,N,17]│
+                                    │                  │
+                                    │ 2. DeepContext   │
+                                    │    Encoder       │
+                                    │    → [batch,N,32]│
+                                    │                  │
+                                    │ 3. Concatenate   │
+                                    │    [t_emb||ctx]  │
+                                    │    → [batch,N,49]│
+                                    │                  │
+                                    │ 4. Input Proj    │
+                                    │    Linear(49→128)│
+                                    │    → [batch,N,128]│
+                                    │                  │
+                                    │ 5. Transformer   │
+                                    │    Encoder       │
+                                    │    (4 layers)    │
+                                    │    → [batch,N,128]│
+                                    └────────┬─────────┘
+                                             │
+                                             │ shared_emb: [batch, N, 128]
+                                             │
+                                    ┌────────▼──────────────────────────┐
+                                    │ z0 Derivation                    │
+                                    │ - Take first 10 time steps      │
+                                    │ - Mean pooling → z0_tokens      │
+                                    │ - Project to latent_dim         │
+                                    └────────┬─────────────────────────┘
+                                             │
+                                             │ z0: [batch, 64]
+                                             │
+                                    ┌────────▼──────────────────────────┐
+                                    │ LatentODEBlock                    │
+                                    │ (Euler Integration)               │
+                                    │ - condition = shared_emb         │
+                                    │ - Integrate over full grid      │
+                                    └────────┬─────────────────────────┘
+                                             │
+                                             │ z_traj: [batch, N, 64]
+                                             │
+                                    ┌────────▼──────────────────────────┐
+                                    │ Dedicated Branches                │
+                                    │                                   │
+                                    │ ┌──────────┬──────────┬─────────┐│
+                                    │ │Trans     │Rotation  │Mass     ││
+                                    │ │Branch    │Branch    │Branch   ││
+                                    │ │[64→128→  │[64→256→  │[64→64→  ││
+                                    │ │128→6]    │256→7]    │1]      ││
+                                    │ └────┬─────┴────┬─────┴────┬────┘│
+                                    │      │          │          │      │
+                                    │      │          │          │      │
+                                    │ trans:│rotation:│mass:     │      │
+                                    │[batch,│[batch,  │[batch,   │      │
+                                    │N,6]   │N,7]     │N,1]      │      │
+                                    └───────┴──────────┴──────────┴──────┘
+                                             │
+                                    ┌────────▼─────────┐
+                                    │ Quaternion Norm  │
+                                    │ normalize_quat() │
+                                    └────────┬─────────┘
+                                             │
+                                    ┌────────▼─────────┐
+                                    │ Concatenate      │
+                                    │ [trans||rot_norm||mass]│
+                                    └────────┬─────────┘
+                                             │
+                                             │ state_delta: [batch, N, 14]
+                                             │
+                                    ┌────────▼─────────┐
+                                    │ Add Initial State │
+                                    │ s0: [batch, 14]  │
+                                    │ → broadcast      │
+                                    └────────┬─────────┘
+                                             │
+                                             │ state: [batch, N, 14] = s0 + delta
+                                             │
+                                             ▼
+                                    ┌──────────────────┐
+                                    │ Loss Function    │
+                                    │ (Data+Phys+BC)   │
+                                    └──────────────────┘
+```
+
+### 6.3 Why It Would Be Better
+
+#### 1. **Shared Learning of Global Physics**
+
+**Why It Matters:**
+- **Direction C1 Problem**: Split heads process decoder features independently, but decoder features may not capture global physics patterns effectively. Each head must learn physics relationships from its own perspective.
+- **C2 Solution**: Shared Stem processes entire sequence through Transformer, learning global temporal + context patterns. All branches receive the same shared representation, enabling them to leverage global physics knowledge.
+- **Expected Impact**:
+  - Branches can learn from global patterns (e.g., "high altitude → low density → different aerodynamics")
+  - Shared representation captures cross-component relationships (e.g., rotation affects translation through aerodynamic forces)
+  - Better generalization: shared physics knowledge transfers across branches
+
+**Specific Improvement**: The Shared Stem learns that "early in trajectory, high thrust + low mass → high acceleration" and "late in trajectory, low mass + high altitude → different dynamics". This global knowledge is available to all branches, so:
+- Translation branch knows when to expect high velocities
+- Rotation branch knows when aerodynamic forces are significant
+- Mass branch knows the depletion profile affects all other components
+
+#### 2. **True Specialization Without Interference**
+
+**Why It Matters:**
+- **Direction C1 Problem**: Split heads share the same decoder features, which may cause interference. For example, if decoder learns a pattern that helps translation but hurts rotation, both heads are affected.
+- **C2 Solution**: Dedicated branches are completely independent networks with separate parameters. Each branch can specialize without affecting others.
+- **Expected Impact**:
+  - Translation branch can learn smooth position/velocity patterns without worrying about quaternion constraints
+  - Rotation branch can focus on unit-norm quaternions and angular velocity coupling
+  - Mass branch can learn monotonic decrease without interference from other components
+  - No gradient conflicts between branches
+
+**Specific Improvement**: The rotation branch (256 neurons) can dedicate all its capacity to learning quaternion dynamics and angular velocity, while the translation branch (128 neurons) focuses on simpler position/velocity patterns. The mass branch (64 neurons) handles the simplest task. This specialization prevents the model from trying to learn conflicting patterns in a shared representation.
+
+#### 3. **Full-Sequence Temporal Awareness**
+
+**Why It Matters:**
+- **Direction C1 Problem**: Transformer encoder processes only first 10 time steps for z0 computation. The rest of the sequence is not processed through Transformer, missing long-range temporal dependencies.
+- **C2 Solution**: Shared Stem processes **entire sequence** (N=1501) through Transformer before deriving z0. All time steps contribute to shared representation.
+- **Expected Impact**:
+  - Captures long-range dependencies (e.g., early mass depletion affects late trajectory)
+  - Better temporal pattern recognition across full trajectory
+  - More accurate z0 initialization (derived from full-sequence understanding)
+  - Improved physics consistency (global patterns inform local evolution)
+
+**Specific Improvement**: The Shared Stem can learn that "if mass depletes quickly in first 100 steps, then late trajectory will have different dynamics". This global understanding informs the z0 initialization and affects the entire ODE evolution, leading to more physically consistent trajectories.
+
+#### 4. **Hierarchical Feature Learning**
+
+**Why It Matters:**
+- **Direction C1 Problem**: Features flow: `z0 → ODE → decoder → heads`. This is a linear pipeline where each stage must learn everything from scratch.
+- **C2 Solution**: Hierarchical learning:
+  - **Level 1 (Shared Stem)**: Learns global physics patterns (temporal + context)
+  - **Level 2 (Latent ODE)**: Learns state evolution dynamics
+  - **Level 3 (Branches)**: Learns component-specific mappings
+- **Expected Impact**:
+  - Each level can focus on its specific task
+  - Lower levels provide rich features for higher levels
+  - Better feature reuse and efficiency
+
+**Specific Improvement**: The Shared Stem learns "high wind_mag + low Cd → different trajectory shape", which is encoded in the shared embedding. The Latent ODE uses this embedding to evolve state, and the branches decode to specific components. This hierarchical structure is more efficient than learning everything end-to-end.
+
+#### 5. **Better Branch Capacity Allocation**
+
+**Why It Matters:**
+- **Direction C1 Problem**: Split heads have same architecture (same width), but different components have different complexity:
+  - Rotation (quaternion + angular velocity) is most complex
+  - Translation (position + velocity) is moderate
+  - Mass (single scalar) is simplest
+- **C2 Solution**: Branches have different capacities:
+  - Rotation branch: 256 neurons (wider, more complex)
+  - Translation branch: 128 neurons (moderate)
+  - Mass branch: 64 neurons (narrower, simpler)
+- **Expected Impact**:
+  - More parameters where needed (rotation)
+  - Fewer parameters where not needed (mass)
+  - Better parameter efficiency
+  - Improved learning for complex components
+
+**Specific Improvement**: The rotation branch gets 256 neurons to handle:
+- Quaternion unit-norm constraint
+- Angular velocity dynamics
+- Coupling with translation through aerodynamics
+- Complex rotation patterns
+
+Meanwhile, the mass branch only needs 64 neurons to learn monotonic decrease, which is much simpler.
+
+#### 6. **Maintains All C1 Advantages**
+
+**Why It Matters:**
+- **C2 Preserves**: All improvements from C1:
+  - Deep context encoder (Set#2)
+  - Quaternion normalization (Set#1)
+  - Δ-state reconstruction (Set#1)
+  - Debug statistics
+- **C2 Adds**: Shared Stem + Dedicated Branches on top
+- **Expected Impact**: Gets all C1 benefits plus new architectural improvements
+
+**Specific Improvement**: C2 is not a replacement but an evolution. It keeps what works (deep context, quaternion norm, Δ-state) and adds new capabilities (shared learning, true specialization, full-sequence awareness).
+
+### 6.4 Why It May Still Not Work / Give Good Results
+
+#### 1. **Shared Stem May Learn Spurious Patterns**
+
+**Problem**: The Shared Stem processes entire sequence through Transformer, which may learn patterns that don't correspond to physical dynamics:
+- Attention may focus on spurious correlations
+- Global patterns may not generalize to unseen contexts
+- Transformer may overfit to training sequence structures
+
+**Impact**: If Shared Stem learns wrong patterns, all branches receive incorrect shared representation, leading to poor predictions across all components.
+
+#### 2. **Information Bottleneck in Shared Embedding**
+
+**Problem**: Shared Stem must compress information from:
+- Time features (17D)
+- Context embedding (32D)
+- Temporal patterns (N=1501 time steps)
+
+Into a single 128D shared embedding that all branches use. This is a significant compression that may lose important information.
+
+**Impact**: 
+- Critical physics information may be lost in compression
+- Branches may receive insufficient information for accurate predictions
+- Different branches may need different information, but they all get the same shared embedding
+
+#### 3. **Branch Independence May Prevent Coordination**
+
+**Problem**: While branch independence prevents interference, it also prevents explicit coordination:
+- Translation, rotation, and mass predictions must be physically consistent
+- No mechanism ensures branches produce compatible outputs
+- May learn conflicting patterns (e.g., translation suggests high velocity but rotation suggests high drag)
+
+**Impact**: Individual components may be accurate but overall trajectory may be inconsistent or unphysical.
+
+#### 4. **Full-Sequence Transformer Complexity**
+
+**Problem**: Processing entire sequence (N=1501) through Transformer is computationally expensive:
+- O(N²) attention complexity
+- Memory-intensive for long sequences
+- May require gradient checkpointing or sequence truncation
+
+**Impact**:
+- Slow training
+- Limited batch size
+- May not scale to longer trajectories
+
+#### 5. **z0 Derivation Still Limited**
+
+**Problem**: Even though Shared Stem processes full sequence, z0 is still derived from only first 10 time steps (encoder window):
+- Information bottleneck remains
+- May not capture enough initial trajectory dynamics
+- Window size is still a hyperparameter
+
+**Impact**: Better shared representation doesn't solve the limited window problem for z0 initialization.
+
+#### 6. **Integration Error Still Present**
+
+**Problem**: Same ODE integration issues as previous directions:
+- Euler method accumulates errors
+- Long trajectories (1501 points) compound integration errors
+- No improvement in numerical integration method
+
+**Impact**: Even with better architecture, integration errors may dominate prediction errors.
+
+#### 7. **No Physics in Latent Dynamics**
+
+**Problem**: Latent dynamics network still learns purely from data:
+- No built-in knowledge of physical dynamics
+- Must learn entire 6-DOF dynamics from scratch
+- May learn unphysical latent dynamics
+
+**Impact**: Architecture improvements don't address the fundamental challenge of learning complex physics.
+
+#### 8. **Hyperparameter Sensitivity**
+
+**Problem**: Many hyperparameters to tune:
+- Shared Stem depth and width
+- Branch architectures (translation/rotation/mass dimensions)
+- Encoder window size
+- Latent dimension
+- ODE dynamics network size
+
+**Impact**: Model performance may be highly sensitive to hyperparameter choices, making it difficult to find good configurations.
+
+#### 9. **Training Complexity**
+
+**Problem**: C2 adds significant complexity:
+- Shared Stem (Transformer with 4 layers)
+- Three independent branches
+- Latent ODE integration
+- Multiple loss components
+
+**Impact**:
+- Harder to train (more components to optimize)
+- Longer training time
+- Higher risk of training instability
+- May require careful initialization and learning rate scheduling
+
+#### 10. **Limited Improvement Over C1**
+
+**Problem**: C2 may not provide significant improvement over C1:
+- C1 already has deep context encoder, split heads, quaternion norm, Δ-state
+- C2 adds Shared Stem and dedicated branches, but may not solve fundamental issues
+- Added complexity may not be worth the marginal improvement
+
+**Impact**: May perform similarly to C1 but with more complexity and training difficulty.
+
+---
+
+## 7. Direction D: Dependency-Aware Backbone + Causal Heads
+
+Direction D abandons the latent-ODE + Δ-state stack and instead enforces physics couplings through the order in which outputs are generated: **mass → attitude → translation**. A single shared backbone emits a latent feature that every head can read, but each downstream head also receives the predictions of the upstream head, making the data flow itself respect thrust-to-weight and aerodynamic dependencies. Direction D1 extends the same idea with explicit physics features and causal temporal integration.
+
+### 7.1 What Changed Compared to Direction C2
+
+1. **Single Backbone, No ODE Block** – Time (8 Fourier frequencies → 17D) and context (32D embedding) feed a `[256, 256, 256, 256]` MLP backbone. There is no Transformer, z₀ derivation, or Δ-state reconstruction, so the model does not require `initial_state`.
+2. **Dependency-Preserving Heads (G3→G2→G1)** – The mass head (G3) fires first and its output is concatenated into the inputs of the attitude head (G2), which then feeds the translation/acceleration head (G1). Translation therefore cannot contradict the mass/attitude it depends on.
+3. **Physics & Causality Hooks (Direction D1)** – D1 swaps quaternion output for a 6D rotation representation, injects density/dynamic-pressure/aero coefficients from `PhysicsComputationLayer`, predicts acceleration instead of Δ-state, and reconstructs velocity/position through an RK4 `TemporalIntegrator`.
+4. **Lightweight Training** – Pure MLP stack with GELU + LayerNorm keeps wall-clock time ≈40% lower than C2 while still supporting the same loss structure (data + physics + boundary).
+
+### 7.2 Architecture Outline
+
+```
+t → FourierFeatures (17) ----┐
+context → ContextEncoder ----┤
+                              ▼
+                        Shared Backbone
+                           [256×4]
+                              │ latent
+                              ▼
+                 ┌────────────────────────┐
+                 │ G3: Mass Head          │ → m_pred
+                 └──────────┬─────────────┘
+                            ▼
+                 ┌────────────────────────┐
+                 │ G2: Attitude + ω Head  │
+                 │ input = [latent || m]  │ → q_pred, w_pred
+                 └──────────┬─────────────┘
+                            ▼
+                 ┌────────────────────────────────┐
+                 │ G1: Translation / Accel Head   │
+                 │ input = [latent || m || q || w │
+                 │          (+ physics in D1)]     │
+                 └──────────┬──────────────────────┘
+                            ▼
+                 ┌────────────────────────────────────────┐
+                 │ Direction D: concat → state [14]       │
+                 │ Direction D1: RK4 integrate accel → v,z│
+                 └────────────────────────────────────────┘
+```
+
+### 7.3 Feature Highlights
+
+- **Ordered Coupling Instead of Auxiliary Losses** – Translation is conditioned on the mass and quaternion it depends on, so thrust-to-weight and aerodynamic coupling emerge from the architecture itself.
+- **Shared Context Without Attention** – The backbone embeds global scenario information without a Transformer, keeping gradients stable and inference latency low.
+- **Quaternion Stability** – D normalizes quaternions immediately after G2; D1’s 6D representation removes normalization issues entirely.
+- **Physics Hints (D1)** – Density, dynamic pressure, and aerodynamic coefficients guide the attitude and acceleration heads toward physically plausible regimes.
+- **Causal Integration** – D1 integrates acceleration with RK4, enforcing that velocity/position are time integrals of the predicted accelerations.
+
+### 7.4 Early Results (exp6 & exp7)
+
+| Experiment | Model | Total RMSE | Translation RMSE | Rotation RMSE | Notes |
+|------------|-------|------------|------------------|---------------|-------|
+| `exp6_24_11_direction_d_baseline` | Direction D | **0.300** | 0.436 | 0.127 | Fastest training loop; quaternions stay on-unit after G2 normalization. |
+| `exp7_24_11_direction_d1_baseline` | Direction D1 | **0.285** | 0.382 | 0.188 | RK4 integrator lowers `vz` error but 6D→quat decoding still tuning-sensitive. |
+
+**Observations**
+- Mass predictions remain monotonic without explicit Δ-state constraints, but Δ magnitude (mean ≈ 2.5) is higher than Δ-state models. Light slope regularization could help.
+- Physics-aware features reduce vertical acceleration error yet introduce sensitivity to aero coefficients; we may need to regularize the physics layer outputs.
+- Removing `initial_state` requirements simplifies evaluation scripts; D1 can optionally take `s₀` for better integration but still runs without it.
+
+### 7.5 Open Questions
+
+1. **Do we still need latent ODEs?** – D shows ≤0.30 RMSE with pure MLPs; we should benchmark against tuned C-series to decide.  
+2. **Mass Constraints** – Consider a softplus-constrained head to guarantee `ṁ ≤ 0`.  
+3. **Physics Iterations** – Feeding back integrated altitude/velocity into another physics pass could improve drag modeling.  
+4. **Curriculum for Ordered Heads** – Because G1 depends on G2/G3, freezing G1 for a few epochs may stabilize early training.
+
+Direction D offers a low-latency alternative to the hybrid stack, while Direction D1 re-introduces physics structure without Shared Stem + Latent ODE overhead. Both will act as baselines for future Direction E ideas.

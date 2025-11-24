@@ -315,6 +315,38 @@ def main():
             layer_norm=bool(model_cfg.get("layer_norm", True)),
             dropout=safe_float(model_cfg.get("dropout"), 0.05)
         ).to(device)
+    elif model_type == "direction_d":
+        from src.models.direction_d_pinn import DirectionDPINN
+        
+        model = DirectionDPINN(
+            context_dim=context_dim,
+            fourier_features=int(model_cfg.get("fourier_features", 8)),
+            context_embedding_dim=int(model_cfg.get("context_embedding_dim", 32)),
+            backbone_hidden_dims=model_cfg.get("backbone_hidden_dims", [256, 256, 256, 256]),
+            head_g3_hidden_dims=model_cfg.get("head_g3_hidden_dims", [128, 64]),
+            head_g2_hidden_dims=model_cfg.get("head_g2_hidden_dims", [256, 128, 64]),
+            head_g1_hidden_dims=model_cfg.get("head_g1_hidden_dims", [256, 128, 128, 64]),
+            activation=model_cfg.get("activation", "gelu"),
+            layer_norm=bool(model_cfg.get("layer_norm", True)),
+            dropout=safe_float(model_cfg.get("dropout"), 0.0),
+        ).to(device)
+    elif model_type == "direction_d1":
+        from src.models.direction_d_pinn import DirectionDPINN_D1
+        
+        model = DirectionDPINN_D1(
+            context_dim=context_dim,
+            fourier_features=int(model_cfg.get("fourier_features", 8)),
+            context_embedding_dim=int(model_cfg.get("context_embedding_dim", 32)),
+            backbone_hidden_dims=model_cfg.get("backbone_hidden_dims", [256, 256, 256, 256]),
+            head_g3_hidden_dims=model_cfg.get("head_g3_hidden_dims", [128, 64]),
+            head_g2_hidden_dims=model_cfg.get("head_g2_hidden_dims", [256, 128, 64]),
+            head_g1_hidden_dims=model_cfg.get("head_g1_hidden_dims", [256, 128, 128, 64]),
+            activation=model_cfg.get("activation", "gelu"),
+            layer_norm=bool(model_cfg.get("layer_norm", True)),
+            dropout=safe_float(model_cfg.get("dropout"), 0.0),
+            integration_method=model_cfg.get("integration_method", "rk4"),
+            use_physics_aware=bool(model_cfg.get("use_physics_aware", True)),
+        ).to(device)
     elif model_type == "latent_ode":
         from src.models.latent_ode import RocketLatentODEPINN
         model = RocketLatentODEPINN(
@@ -389,21 +421,78 @@ def main():
             dropout=safe_float(model_cfg.get("dropout"), 0.05),
             debug_stats=bool(model_cfg.get("debug_stats", True)),
         ).to(device)
+    elif model_type == "hybrid_c2":
+        from src.models.hybrid_pinn import RocketHybridPINNC2
+
+        model = RocketHybridPINNC2(
+            context_dim=context_dim,
+            latent_dim=int(model_cfg.get("latent_dim", 64)),
+            fourier_features=int(model_cfg.get("fourier_features", 8)),
+            shared_stem_hidden_dim=int(model_cfg.get("shared_stem_hidden_dim", 128)),
+            temporal_type=model_cfg.get("temporal_type", "transformer"),
+            temporal_n_layers=int(model_cfg.get("temporal_n_layers", 4)),
+            temporal_n_heads=int(model_cfg.get("temporal_n_heads", 4)),
+            temporal_dim_feedforward=int(model_cfg.get("temporal_dim_feedforward", 512)),
+            encoder_window=int(model_cfg.get("encoder_window", 10)),
+            translation_branch_dims=model_cfg.get("translation_branch_dims", [128, 128]),
+            rotation_branch_dims=model_cfg.get("rotation_branch_dims", [256, 256]),
+            mass_branch_dims=model_cfg.get("mass_branch_dims", [64]),
+            activation=model_cfg.get("activation", "tanh"),
+            transformer_activation=model_cfg.get("transformer_activation", "gelu"),
+            dynamics_n_hidden=int(model_cfg.get("dynamics_n_hidden", 3)),
+            dynamics_n_neurons=int(model_cfg.get("dynamics_n_neurons", 128)),
+            layer_norm=bool(model_cfg.get("layer_norm", True)),
+            dropout=safe_float(model_cfg.get("dropout"), 0.05),
+            debug_stats=bool(model_cfg.get("debug_stats", True)),
+        ).to(device)
+    elif model_type == "hybrid_c3":
+        from src.models.hybrid_pinn import RocketHybridPINNC3
+
+        model = RocketHybridPINNC3(
+            context_dim=context_dim,
+            latent_dim=int(model_cfg.get("latent_dim", 64)),
+            fourier_features=int(model_cfg.get("fourier_features", 8)),
+            shared_stem_hidden_dim=int(model_cfg.get("shared_stem_hidden_dim", 128)),
+            temporal_type=model_cfg.get("temporal_type", "transformer"),
+            temporal_n_layers=int(model_cfg.get("temporal_n_layers", 4)),
+            temporal_n_heads=int(model_cfg.get("temporal_n_heads", 4)),
+            temporal_dim_feedforward=int(model_cfg.get("temporal_dim_feedforward", 512)),
+            encoder_window=int(model_cfg.get("encoder_window", 10)),
+            translation_branch_dims=model_cfg.get("translation_branch_dims", [128, 128]),
+            rotation_branch_dims=model_cfg.get("rotation_branch_dims", [256, 256]),
+            mass_branch_dims=model_cfg.get("mass_branch_dims", [64]),
+            activation=model_cfg.get("activation", "tanh"),
+            transformer_activation=model_cfg.get("transformer_activation", "gelu"),
+            dynamics_n_hidden=int(model_cfg.get("dynamics_n_hidden", 3)),
+            dynamics_n_neurons=int(model_cfg.get("dynamics_n_neurons", 128)),
+            layer_norm=bool(model_cfg.get("layer_norm", True)),
+            dropout=safe_float(model_cfg.get("dropout"), 0.05),
+            debug_stats=bool(model_cfg.get("debug_stats", True)),
+            use_physics_aware_translation=bool(model_cfg.get("use_physics_aware_translation", False)),
+            use_coordinated_branches=bool(model_cfg.get("use_coordinated_branches", False)),
+        ).to(device)
     else:
         raise ValueError(
             "Unknown model type: "
-            f"{model_type}. Supported: 'pinn', 'latent_ode', 'sequence', 'hybrid'"
+            f"{model_type}. Supported: 'pinn', 'latent_ode', 'sequence', 'hybrid', 'hybrid_c1', 'hybrid_c2', 'hybrid_c3'"
         )
     
     print(f"Model parameters: {sum(p.numel() for p in model.parameters()):,}")
     
-    # Create loss function
+    # Create loss function with enhanced parameters
+    component_weights = loss_cfg.get("component_weights", None)
     loss_fn = PINNLoss(
         lambda_data=safe_float(loss_cfg.get("lambda_data"), 1.0),
         lambda_phys=safe_float(loss_cfg.get("lambda_phys"), 0.1),
         lambda_bc=safe_float(loss_cfg.get("lambda_bc"), 1.0),
         physics_params=physics_params,
-        scales=scales
+        scales=scales,
+        component_weights=component_weights,
+        lambda_quat_norm=safe_float(loss_cfg.get("lambda_quat_norm"), 0.0),
+        lambda_mass_flow=safe_float(loss_cfg.get("lambda_mass_flow"), 0.0),
+        lambda_translation=safe_float(loss_cfg.get("lambda_translation"), 1.0),
+        lambda_rotation=safe_float(loss_cfg.get("lambda_rotation"), 1.0),
+        lambda_mass=safe_float(loss_cfg.get("lambda_mass"), 1.0),
     )
     
     # Create optimizer

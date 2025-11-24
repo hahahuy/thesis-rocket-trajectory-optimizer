@@ -1,0 +1,29 @@
+# Model architecture configuration for PINN - Direction D1: Upgraded Backbone + 3 Heads
+# Physics & Causality Awareness
+
+model:
+  type: direction_d1  # Upgraded Direction D with physics-aware and causal integration
+  
+  # Feature encoding
+  fourier_features: 8              # Number of Fourier frequencies (K)
+  context_embedding_dim: 32        # Dimension of context embedding
+  
+  # Shared backbone
+  backbone_hidden_dims: [256, 256, 256, 256]  # Hidden dimensions for backbone MLP
+  
+  # Head architectures
+  head_g3_hidden_dims: [128, 64]              # Mass head (G3)
+  head_g2_hidden_dims: [256, 128, 64]         # Attitude head (G2) - 6D rotation
+  head_g1_hidden_dims: [256, 128, 128, 64]    # Acceleration head (G1)
+  
+  # Activation and regularization
+  activation: gelu                 # Activation function (gelu recommended)
+  layer_norm: true                 # Use layer normalization
+  dropout: 0.0                     # Dropout rate (0.0 recommended)
+  
+  # Direction D1 specific
+  integration_method: rk4         # Integration method: "rk4" or "euler"
+  use_physics_aware: true         # Enable physics-aware features (density, drag, etc.)
+
+
+

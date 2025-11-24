@@ -1,0 +1,24 @@
+# Model architecture configuration for PINN - Direction D: Backbone + 3 Heads
+# Dependency-Aware Single Model
+
+model:
+  type: direction_d  # Backbone + 3 Dependency-Aware Heads architecture
+  
+  # Feature encoding
+  fourier_features: 8              # Number of Fourier frequencies (K)
+  context_embedding_dim: 32        # Dimension of context embedding
+  
+  # Shared backbone
+  backbone_hidden_dims: [256, 256, 256, 256]  # Hidden dimensions for backbone MLP
+  
+  # Head architectures
+  head_g3_hidden_dims: [128, 64]              # Mass head (G3)
+  head_g2_hidden_dims: [256, 128, 64]         # Attitude head (G2)
+  head_g1_hidden_dims: [256, 128, 128, 64]    # Translation head (G1)
+  
+  # Activation and regularization
+  activation: gelu                 # Activation function (gelu recommended)
+  layer_norm: true                 # Use layer normalization
+  dropout: 0.0                     # Dropout rate (0.0 recommended for Direction D)
+
+

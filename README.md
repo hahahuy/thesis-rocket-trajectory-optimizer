@@ -48,8 +48,11 @@ git clone https://github.com/hahahuy/thesis-rocket-trajectory-optimizer.git
 cd thesis-rocket-trajectory-optimizer
 ```
 
-2. **Install environment (Python + IPOPT deps)**
+2. **Install environment**
 
+See **[docs/SETUP.md](docs/SETUP.md)** for complete setup instructions.
+
+Quick start:
 ```bash
 # Python deps (editable install)
 pip install -e .
@@ -61,7 +64,7 @@ pip install casadi numpy scipy matplotlib h5py pyyaml pytest pytest-cov
 python3 scripts/test_linear_solvers.py
 ```
 
-Tip: Prefer MUMPS by default; HSL/MA97 gives best performance if installed. See the HSL/MUMPS section in `docs/wp2_comprehensive_description.md`.
+**Tip**: Prefer MUMPS by default; HSL/MA97 gives best performance if installed. See **[docs/SETUP_HSL_MUMPS.md](docs/SETUP_HSL_MUMPS.md)** for details.
 
 3. **Build WP1 (C++ physics demos/validation)**
 
@@ -95,12 +98,28 @@ python3 scripts/plot_trajectory.py --input experiments/wp2_validation.json || tr
 
 ## Documentation
 
-* WP1 (physics core): `docs/wp1_comprehensive_description.md`
-* WP2 (OCP baseline): `docs/wp2_comprehensive_description.md`
-  - Includes: operations guide (how to run), and HSL/MUMPS installation notes
-* Design overview: `docs/design.md`
-* Setup: `docs/setup_guide.md`, `docs/QUICK_START_HSL.md`
-* CI/setup: `docs/ci_setup.md`
+### Quick Start
+* **[docs/SETUP.md](docs/SETUP.md)**: Main setup guide with quick start
+* **[docs/SETUP_ENVIRONMENT.md](docs/SETUP_ENVIRONMENT.md)**: Complete environment setup (Python, C++, Windows, CI/CD)
+* **[docs/SETUP_HSL_MUMPS.md](docs/SETUP_HSL_MUMPS.md)**: HSL/MUMPS linear solver setup
+
+### Architecture & Design
+* **[docs/DESIGN.md](docs/DESIGN.md)**: High-level system architecture and design overview
+* **[docs/architecture_diagram.md](docs/architecture_diagram.md)**: Mermaid diagrams for all PINN architectures
+* **[docs/ARCHITECTURE_CHANGELOG.md](docs/ARCHITECTURE_CHANGELOG.md)**: PINN architecture evolution history
+
+### Work Package Documentation
+* **[docs/wp1_comprehensive_description.md](docs/wp1_comprehensive_description.md)**: Physics core (6-DOF dynamics library)
+* **[docs/wp2_comprehensive_description.md](docs/wp2_comprehensive_description.md)**: Optimal control baseline (CasADi/IPOPT solver)
+* **[docs/wp3_comprehensive_description.md](docs/wp3_comprehensive_description.md)**: Dataset generation and preprocessing
+* **[docs/wp4_comprehensive_description.md](docs/wp4_comprehensive_description.md)**: PINN training and models
+
+### Results & Analysis
+* **[docs/RESULTS_AND_VALIDATION.md](docs/RESULTS_AND_VALIDATION.md)**: Validation results (WP1-4) and experiment summaries (exp1-5)
+* **[docs/expANAL_SOLS.md](docs/expANAL_SOLS.md)**: C3 architecture implementation guide
+
+### Documentation Guide
+* **[docs/README.md](docs/README.md)**: Complete documentation structure and navigation guide
 
 ---
 

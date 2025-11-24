@@ -1,0 +1,54 @@
+# Model architecture configuration for PINN - Direction C3: Enhanced Hybrid PINN
+# [PINN_V2][2025-XX-XX][C3 Architecture]
+# C3 = C2 + 6 Architectural Solutions for RMSE reduction
+
+model:
+  type: hybrid_c3  # Enhanced C2 with RMSE reduction solutions
+  
+  # Latent ODE parameters
+  latent_dim: 64
+  fourier_features: 8
+  
+  # Shared Stem parameters
+  shared_stem_hidden_dim: 128  # Dimension of shared embedding
+  temporal_type: transformer   # transformer | tcn (future)
+  temporal_n_layers: 4          # Number of Transformer layers in shared stem
+  temporal_n_heads: 4           # Number of attention heads
+  temporal_dim_feedforward: 512 # Feedforward dimension in Transformer
+  
+  # Encoder window for z0 derivation
+  encoder_window: 10            # Number of initial timesteps used to derive z0
+  
+  # Dedicated Branch architectures
+  translation_branch_dims: [128, 128]  # Hidden dimensions for translation branch
+  rotation_branch_dims: [256, 256]     # Hidden dimensions for rotation branch (wider)
+  mass_branch_dims: [64]               # Hidden dimensions for mass branch (narrower)
+  
+  # Latent dynamics network
+  dynamics_n_hidden: 3
+  dynamics_n_neurons: 128
+  
+  # Activation functions
+  activation: tanh              # For latent dynamics
+  transformer_activation: gelu  # For Transformer layers
+  
+  # Regularization
+  layer_norm: true
+  dropout: 0.05
+  
+  # Debug
+  debug_stats: true
+  
+  # C3-specific parameters (Phase 1: Core solutions always enabled)
+  # Solution 3: MonotonicMassBranch (always enabled)
+  # Solution 2: RotationBranchMinimal (always enabled)
+  # Solution 4: LatentODEBlockRK4 (always enabled)
+  
+  # Phase 2 features (optional)
+  use_physics_aware_translation: false  # Solution 1: PhysicsAwareTranslationBranch
+  use_coordinated_branches: false      # Solution 5: CoordinatedBranches
+  
+  # Phase 3 features (optional, not yet implemented)
+  # z0_blend_alpha: 0.3  # Solution 6: EnhancedZ0Derivation (weight for physics-informed z0)
+
+

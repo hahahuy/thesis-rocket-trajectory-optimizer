@@ -1,0 +1,75 @@
+# Complete training configuration for PINN - Direction C3: Enhanced Hybrid PINN
+# [PINN_V2][2025-XX-XX][C3 Architecture]
+# C3 = C2 + 6 Architectural Solutions for RMSE reduction
+
+model:
+  type: hybrid_c3  # Enhanced C2 with RMSE reduction solutions
+  
+  # Latent ODE parameters
+  latent_dim: 64
+  fourier_features: 8
+  
+  # Shared Stem parameters
+  shared_stem_hidden_dim: 128
+  temporal_type: transformer
+  temporal_n_layers: 4
+  temporal_n_heads: 4
+  temporal_dim_feedforward: 512
+  encoder_window: 10
+  
+  # Dedicated Branch architectures
+  translation_branch_dims: [128, 128]
+  rotation_branch_dims: [256, 256]
+  mass_branch_dims: [64]
+  
+  # Latent dynamics network
+  dynamics_n_hidden: 3
+  dynamics_n_neurons: 128
+  
+  # Activation functions
+  activation: tanh
+  transformer_activation: gelu
+  
+  # Regularization
+  layer_norm: true
+  dropout: 0.05
+  debug_stats: true
+  
+  # C3-specific parameters (Phase 1: Core solutions always enabled)
+  # Phase 2 features (optional)
+  use_physics_aware_translation: false  # Solution 1: PhysicsAwareTranslationBranch
+  use_coordinated_branches: false      # Solution 5: CoordinatedBranches
+
+train:
+  experiment_name: hybrid_c3_full
+  batch_size: 8
+  num_workers: 0
+  epochs: 100
+  learning_rate: 1e-3
+  weight_decay: 1e-5
+  time_subsample: null  # Full time grid
+  
+  # Early stopping
+  early_stopping_patience: 10
+  early_stopping_min_delta: 0.0
+  
+  # Learning rate scheduler
+  scheduler:
+    type: cosine
+    kwargs:
+      T_max: 100
+      eta_min: 1e-6
+
+# Loss configuration
+loss:
+  lambda_data: 1.0
+  lambda_phys: 0.1
+  lambda_bc: 1.0
+  lambda_phys_final: 1.0
+  homotopy_schedule: linear  # linear | exponential | fixed
+
+# Physics and scaling configs
+physics_config: configs/phys.yaml
+scales_config: configs/scales.yaml
+
+

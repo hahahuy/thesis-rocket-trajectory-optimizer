@@ -143,6 +143,105 @@ class LatentODEBlock(nn.Module):
         return z_traj
 
 
+class LatentODEBlockRK4(nn.Module):
+    """
+    [PINN_V2][2025-XX-XX][C3 Architecture - Solution 4]
+    4th-order Runge-Kutta integrator for latent ODE.
+    
+    Integrates: dz/dt = g_θ(z, t, ctx_emb) using RK4 method.
+    Error: O(dt⁴) vs Euler's O(dt) - ~1000x smaller per step.
+    
+    RK4 stages:
+    k1 = f(z_i, cond_i)
+    k2 = f(z_i + dt/2*k1, cond_mid)
+    k3 = f(z_i + dt/2*k2, cond_mid)
+    k4 = f(z_i + dt*k3, cond_end)
+    z_{i+1} = z_i + dt/6*(k1+2*k2+2*k3+k4)
+    """
+    
+    def __init__(self, dynamics_net: LatentDynamicsNet):
+        super().__init__()
+        self.dynamics_net = dynamics_net
+    
+    def forward(
+        self,
+        z0: torch.Tensor,
+        t: torch.Tensor,
+        condition: torch.Tensor
+    ) -> torch.Tensor:
+        """
+        Integrate latent ODE from z0 over time grid t using RK4.
+        
+        Args:
+            z0: Initial latent state [batch, latent_dim]
+            t: Time grid [batch, N, 1] or [N, 1]
+            condition: Condition vectors [batch, N, condition_dim] or [N, condition_dim]
+            
+        Returns:
+            z_traj: Latent trajectory [batch, N, latent_dim] or [N, latent_dim]
+        """
+        # Ensure batched format
+        if t.dim() == 2:
+            t = t.unsqueeze(0)  # [1, N, 1]
+            condition = condition.unsqueeze(0)  # [1, N, condition_dim]
+            z0 = z0.unsqueeze(0)  # [1, latent_dim]
+            was_unbatched = True
+        else:
+            was_unbatched = False
+        
+        batch_size, N, _ = t.shape
+        latent_dim = z0.shape[-1]
+        
+        # Initialize trajectory
+        z_traj = torch.zeros(batch_size, N, latent_dim, device=z0.device, dtype=z0.dtype)
+        z_traj[:, 0, :] = z0
+        
+        # RK4 integration
+        z_current = z0  # [batch, latent_dim]
+        
+        for i in range(N - 1):
+            # Current time step and condition
+            t_i = t[:, i, 0]  # [batch]
+            t_next = t[:, i+1, 0]  # [batch]
+            dt = (t_next - t_i).unsqueeze(-1)  # [batch, 1]
+            
+            cond_i = condition[:, i, :]  # [batch, condition_dim]
+            
+            # Interpolate condition for mid-points (linear interpolation)
+            if i < N - 1:
+                cond_next = condition[:, i+1, :]  # [batch, condition_dim]
+                cond_mid = 0.5 * (cond_i + cond_next)  # [batch, condition_dim]
+            else:
+                cond_mid = cond_i
+                cond_next = cond_i
+            
+            # RK4 stages
+            # k1 = f(z_i, cond_i)
+            k1 = self.dynamics_net(z_current, cond_i)  # [batch, latent_dim]
+            
+            # k2 = f(z_i + dt/2*k1, cond_mid)
+            z_mid1 = z_current + 0.5 * dt * k1  # [batch, latent_dim]
+            k2 = self.dynamics_net(z_mid1, cond_mid)  # [batch, latent_dim]
+            
+            # k3 = f(z_i + dt/2*k2, cond_mid)
+            z_mid2 = z_current + 0.5 * dt * k2  # [batch, latent_dim]
+            k3 = self.dynamics_net(z_mid2, cond_mid)  # [batch, latent_dim]
+            
+            # k4 = f(z_i + dt*k3, cond_next)
+            z_end = z_current + dt * k3  # [batch, latent_dim]
+            k4 = self.dynamics_net(z_end, cond_next)  # [batch, latent_dim]
+            
+            # RK4 step: z_{i+1} = z_i + dt/6*(k1+2*k2+2*k3+k4)
+            z_next = z_current + (dt / 6.0) * (k1 + 2.0*k2 + 2.0*k3 + k4)
+            z_traj[:, i+1, :] = z_next
+            z_current = z_next
+        
+        if was_unbatched:
+            z_traj = z_traj.squeeze(0)  # [N, latent_dim]
+        
+        return z_traj
+
+
 class RocketLatentODEPINN(nn.Module):
     """
     [PINN_V2][2025-01-XX][Direction A]

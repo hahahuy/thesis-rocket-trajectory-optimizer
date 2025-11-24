@@ -192,7 +192,7 @@ Typical nominal values (small sounding rockets):
 
 - WP1+ Summary: `docs/wp1_plus_summary.md`  
 - Task 1 summary: `docs/task1_summary.md`  
-- Design: `docs/design.md`  
+- Design: `docs/DESIGN.md`  
 - Architecture diagram: `docs/architecture_diagram.md`  
 - Configs: `configs/phys.yaml`, `configs/limits.yaml`, `configs/scales.yaml`
 

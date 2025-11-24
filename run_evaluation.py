@@ -60,6 +60,40 @@ def create_model(model_cfg, context_dim):
             context_embedding_dim=safe_int(model_cfg.get("context_embedding_dim", 16)),
         )
 
+    if model_type == "direction_d":
+        from src.models.direction_d_pinn import DirectionDPINN
+
+        return DirectionDPINN(
+            context_dim=context_dim,
+            fourier_features=safe_int(model_cfg.get("fourier_features", 8)),
+            context_embedding_dim=safe_int(model_cfg.get("context_embedding_dim", 32)),
+            backbone_hidden_dims=model_cfg.get("backbone_hidden_dims", [256, 256, 256, 256]),
+            head_g3_hidden_dims=model_cfg.get("head_g3_hidden_dims", [128, 64]),
+            head_g2_hidden_dims=model_cfg.get("head_g2_hidden_dims", [256, 128, 64]),
+            head_g1_hidden_dims=model_cfg.get("head_g1_hidden_dims", [256, 128, 128, 64]),
+            activation=model_cfg.get("activation", "gelu"),
+            layer_norm=bool(model_cfg.get("layer_norm", True)),
+            dropout=safe_float(model_cfg.get("dropout"), 0.0),
+        )
+
+    if model_type == "direction_d1":
+        from src.models.direction_d_pinn import DirectionDPINN_D1
+
+        return DirectionDPINN_D1(
+            context_dim=context_dim,
+            fourier_features=safe_int(model_cfg.get("fourier_features", 8)),
+            context_embedding_dim=safe_int(model_cfg.get("context_embedding_dim", 32)),
+            backbone_hidden_dims=model_cfg.get("backbone_hidden_dims", [256, 256, 256, 256]),
+            head_g3_hidden_dims=model_cfg.get("head_g3_hidden_dims", [128, 64]),
+            head_g2_hidden_dims=model_cfg.get("head_g2_hidden_dims", [256, 128, 64]),
+            head_g1_hidden_dims=model_cfg.get("head_g1_hidden_dims", [256, 128, 128, 64]),
+            activation=model_cfg.get("activation", "gelu"),
+            layer_norm=bool(model_cfg.get("layer_norm", True)),
+            dropout=safe_float(model_cfg.get("dropout"), 0.0),
+            integration_method=model_cfg.get("integration_method", "rk4"),
+            use_physics_aware=bool(model_cfg.get("use_physics_aware", True)),
+        )
+
     if model_type == "residual":
         return ResidualNet(
             context_dim=context_dim,
@@ -151,9 +185,77 @@ def create_model(model_cfg, context_dim):
             debug_stats=bool(model_cfg.get("debug_stats", True)),
         )
 
+    if model_type == "hybrid_c2":
+        from src.models.hybrid_pinn import RocketHybridPINNC2
+
+        return RocketHybridPINNC2(
+            context_dim=context_dim,
+            latent_dim=safe_int(model_cfg.get("latent_dim", 64)),
+            fourier_features=safe_int(model_cfg.get("fourier_features", 8)),
+            shared_stem_hidden_dim=safe_int(
+                model_cfg.get("shared_stem_hidden_dim", 128)
+            ),
+            temporal_type=model_cfg.get("temporal_type", "transformer"),
+            temporal_n_layers=safe_int(model_cfg.get("temporal_n_layers", 4)),
+            temporal_n_heads=safe_int(model_cfg.get("temporal_n_heads", 4)),
+            temporal_dim_feedforward=safe_int(
+                model_cfg.get("temporal_dim_feedforward", 512)
+            ),
+            encoder_window=safe_int(model_cfg.get("encoder_window", 10)),
+            translation_branch_dims=model_cfg.get(
+                "translation_branch_dims", [128, 128]
+            ),
+            rotation_branch_dims=model_cfg.get("rotation_branch_dims", [256, 256]),
+            mass_branch_dims=model_cfg.get("mass_branch_dims", [64]),
+            activation=model_cfg.get("activation", "tanh"),
+            transformer_activation=model_cfg.get("transformer_activation", "gelu"),
+            dynamics_n_hidden=safe_int(model_cfg.get("dynamics_n_hidden", 3)),
+            dynamics_n_neurons=safe_int(model_cfg.get("dynamics_n_neurons", 128)),
+            layer_norm=bool(model_cfg.get("layer_norm", True)),
+            dropout=safe_float(model_cfg.get("dropout"), 0.05),
+            debug_stats=bool(model_cfg.get("debug_stats", True)),
+        )
+
+    if model_type == "hybrid_c3":
+        from src.models.hybrid_pinn import RocketHybridPINNC3
+
+        return RocketHybridPINNC3(
+            context_dim=context_dim,
+            latent_dim=safe_int(model_cfg.get("latent_dim", 64)),
+            fourier_features=safe_int(model_cfg.get("fourier_features", 8)),
+            shared_stem_hidden_dim=safe_int(
+                model_cfg.get("shared_stem_hidden_dim", 128)
+            ),
+            temporal_type=model_cfg.get("temporal_type", "transformer"),
+            temporal_n_layers=safe_int(model_cfg.get("temporal_n_layers", 4)),
+            temporal_n_heads=safe_int(model_cfg.get("temporal_n_heads", 4)),
+            temporal_dim_feedforward=safe_int(
+                model_cfg.get("temporal_dim_feedforward", 512)
+            ),
+            encoder_window=safe_int(model_cfg.get("encoder_window", 10)),
+            translation_branch_dims=model_cfg.get(
+                "translation_branch_dims", [128, 128]
+            ),
+            rotation_branch_dims=model_cfg.get("rotation_branch_dims", [256, 256]),
+            mass_branch_dims=model_cfg.get("mass_branch_dims", [64]),
+            activation=model_cfg.get("activation", "tanh"),
+            transformer_activation=model_cfg.get("transformer_activation", "gelu"),
+            dynamics_n_hidden=safe_int(model_cfg.get("dynamics_n_hidden", 3)),
+            dynamics_n_neurons=safe_int(model_cfg.get("dynamics_n_neurons", 128)),
+            layer_norm=bool(model_cfg.get("layer_norm", True)),
+            dropout=safe_float(model_cfg.get("dropout"), 0.05),
+            debug_stats=bool(model_cfg.get("debug_stats", True)),
+            use_physics_aware_translation=bool(
+                model_cfg.get("use_physics_aware_translation", False)
+            ),
+            use_coordinated_branches=bool(
+                model_cfg.get("use_coordinated_branches", False)
+            ),
+        )
+
     raise ValueError(
         f"Unsupported model type '{model_type}'. "
-        "Supported: pinn, residual, latent_ode, sequence, hybrid."
+        "Supported: pinn, residual, latent_ode, sequence, hybrid, hybrid_c1, hybrid_c2, hybrid_c3, direction_d, direction_d1."
     )
 
 

@@ -2,6 +2,8 @@
 Loss functions for PINN training.
 
 Includes data loss, physics loss (ODE residuals), and boundary condition loss.
+Enhanced with component-weighted loss, quaternion normalization penalty,
+and mass flow consistency constraints.
 """
 
 import torch
@@ -15,7 +17,14 @@ class PINNLoss(nn.Module):
     """
     Combined loss for PINN training.
     
-    L = λ_data * L_data + λ_phys * L_phys + λ_bc * L_bc
+    L = λ_data * L_data + λ_phys * L_phys + λ_bc * L_bc + 
+        λ_quat_norm * L_quat_norm + λ_mass_flow * L_mass_flow
+    
+    Enhanced with:
+    - Component-weighted data loss (prioritize z, vz, quaternions)
+    - Quaternion normalization penalty
+    - Mass flow consistency (non-increasing mass)
+    - Group weights for translation/rotation/mass
     """
     
     def __init__(
@@ -24,16 +33,49 @@ class PINNLoss(nn.Module):
         lambda_phys: float = 0.1,
         lambda_bc: float = 1.0,
         physics_params: Optional[Dict] = None,
-        scales: Optional[Dict] = None
+        scales: Optional[Dict] = None,
+        # Enhanced loss parameters
+        component_weights: Optional[Dict[str, float]] = None,
+        lambda_quat_norm: float = 0.0,
+        lambda_mass_flow: float = 0.0,
+        lambda_translation: float = 1.0,
+        lambda_rotation: float = 1.0,
+        lambda_mass: float = 1.0,
     ):
         super().__init__()
         
         self.lambda_data = lambda_data
         self.lambda_phys = lambda_phys
         self.lambda_bc = lambda_bc
+        self.lambda_quat_norm = lambda_quat_norm
+        self.lambda_mass_flow = lambda_mass_flow
+        self.lambda_translation = lambda_translation
+        self.lambda_rotation = lambda_rotation
+        self.lambda_mass = lambda_mass
         
         self.physics_params = physics_params or {}
         self.scales = scales or {}
+        
+        # Component weights for state variables
+        # Default: uniform weights, but can be customized
+        # State order: [x, y, z, vx, vy, vz, q0, q1, q2, q3, wx, wy, wz, m]
+        default_weights = {
+            "x": 1.0, "y": 1.0, "z": 1.0,
+            "vx": 1.0, "vy": 1.0, "vz": 1.0,
+            "q0": 1.0, "q1": 1.0, "q2": 1.0, "q3": 1.0,
+            "wx": 1.0, "wy": 1.0, "wz": 1.0,
+            "m": 1.0,
+        }
+        if component_weights:
+            default_weights.update(component_weights)
+        
+        # Convert to tensor for efficient computation
+        # State indices: [x=0, y=1, z=2, vx=3, vy=4, vz=5, q0=6, q1=7, q2=8, q3=9, wx=10, wy=11, wz=12, m=13]
+        state_order = ["x", "y", "z", "vx", "vy", "vz", "q0", "q1", "q2", "q3", "wx", "wy", "wz", "m"]
+        self.register_buffer(
+            "component_weights_tensor",
+            torch.tensor([default_weights[k] for k in state_order], dtype=torch.float32)
+        )
         
         # Convert params to tensors (will be moved to device in forward)
         self._params_tensors = {
@@ -47,7 +89,7 @@ class PINNLoss(nn.Module):
         true_state: torch.Tensor
     ) -> torch.Tensor:
         """
-        Mean squared error between predicted and true states.
+        Component-weighted mean squared error between predicted and true states.
         
         Args:
             pred_state: [batch, N, 14] or [N, 14]
@@ -56,7 +98,27 @@ class PINNLoss(nn.Module):
         Returns:
             Scalar loss
         """
-        return torch.mean((pred_state - true_state) ** 2)
+        # Ensure batched format
+        if pred_state.dim() == 2:
+            pred_state = pred_state.unsqueeze(0)
+            true_state = true_state.unsqueeze(0)
+        
+        # Compute squared errors per component: [batch, N, 14]
+        squared_errors = (pred_state - true_state) ** 2
+        
+        # Apply component weights: [14] -> [1, 1, 14]
+        weights = self.component_weights_tensor.view(1, 1, -1).to(pred_state.device)
+        weighted_errors = squared_errors * weights
+        
+        # Separate into translation, rotation, mass groups
+        # Translation: [x, y, z, vx, vy, vz] = indices [0:6]
+        # Rotation: [q0, q1, q2, q3, wx, wy, wz] = indices [6:13]
+        # Mass: [m] = index [13]
+        translation_loss = torch.mean(weighted_errors[:, :, 0:6]) * self.lambda_translation
+        rotation_loss = torch.mean(weighted_errors[:, :, 6:13]) * self.lambda_rotation
+        mass_loss = torch.mean(weighted_errors[:, :, 13:14]) * self.lambda_mass
+        
+        return translation_loss + rotation_loss + mass_loss
     
     def physics_loss(
         self,
@@ -157,6 +219,72 @@ class PINNLoss(nn.Module):
         
         return loss
     
+    def quaternion_normalization_loss(
+        self,
+        pred_state: torch.Tensor
+    ) -> torch.Tensor:
+        """
+        Penalty for quaternion normalization deviation.
+        
+        Quaternions should have unit norm: ||q|| = 1
+        Loss: mean((||q|| - 1)^2)
+        
+        Args:
+            pred_state: [batch, N, 14] or [N, 14]
+            
+        Returns:
+            Scalar loss
+        """
+        # Ensure batched format
+        if pred_state.dim() == 2:
+            pred_state = pred_state.unsqueeze(0)
+        
+        # Extract quaternions: [batch, N, 4] (indices 6:10)
+        quaternions = pred_state[:, :, 6:10]  # [batch, N, 4]
+        
+        # Compute quaternion norm: [batch, N]
+        quat_norm = torch.linalg.norm(quaternions, dim=-1)
+        
+        # Penalty for deviation from 1.0
+        norm_deviation = (quat_norm - 1.0) ** 2
+        
+        return torch.mean(norm_deviation)
+    
+    def mass_flow_consistency_loss(
+        self,
+        pred_state: torch.Tensor,
+        t: torch.Tensor
+    ) -> torch.Tensor:
+        """
+        Penalty for mass flow violations (mass should be non-increasing).
+        
+        Mass should decrease or stay constant: m(t+1) <= m(t)
+        Loss: mean(ReLU(m(t) - m(t+1))) for all time steps
+        
+        Args:
+            pred_state: [batch, N, 14] or [N, 14]
+            t: Time [batch, N, 1] or [N, 1]
+            
+        Returns:
+            Scalar loss
+        """
+        # Ensure batched format
+        if pred_state.dim() == 2:
+            pred_state = pred_state.unsqueeze(0)
+            t = t.unsqueeze(0)
+        
+        # Extract mass: [batch, N, 1] (index 13)
+        mass = pred_state[:, :, 13:14]  # [batch, N, 1]
+        
+        # Compute mass differences: m(t) - m(t+1)
+        # Should be >= 0 (non-increasing)
+        mass_diff = mass[:, :-1, :] - mass[:, 1:, :]  # [batch, N-1, 1]
+        
+        # Penalty for negative differences (mass increases)
+        violations = torch.relu(-mass_diff)  # Only penalize when mass increases
+        
+        return torch.mean(violations)
+    
     def boundary_loss(
         self,
         pred_state: torch.Tensor,
@@ -221,17 +349,25 @@ class PINNLoss(nn.Module):
         L_phys = self.physics_loss(t, pred_state, control)
         L_bc = self.boundary_loss(pred_state, true_state, t)
         
+        # Enhanced loss components
+        L_quat_norm = self.quaternion_normalization_loss(pred_state)
+        L_mass_flow = self.mass_flow_consistency_loss(pred_state, t)
+        
         total_loss = (
             self.lambda_data * L_data +
             self.lambda_phys * L_phys +
-            self.lambda_bc * L_bc
+            self.lambda_bc * L_bc +
+            self.lambda_quat_norm * L_quat_norm +
+            self.lambda_mass_flow * L_mass_flow
         )
         
         loss_dict = {
             "total": total_loss,
             "data": L_data,
             "physics": L_phys,
-            "boundary": L_bc
+            "boundary": L_bc,
+            "quat_norm": L_quat_norm,
+            "mass_flow": L_mass_flow
         }
         
         return total_loss, loss_dict
