@@ -19,6 +19,7 @@ Direction D1 Enhancements:
 
 import torch
 import torch.nn as nn
+import torch.nn.functional as F
 from typing import Tuple, Optional
 
 from .architectures import FourierFeatures, ContextEncoder, normalize_quaternion
@@ -368,6 +369,171 @@ def rotation_matrix_to_quaternion(R: torch.Tensor, eps: float = 1e-8) -> torch.T
     q = q.reshape(*original_shape, 4)
     
     return q
+
+
+class DirectionDPINN_D15(nn.Module):
+    """
+    Direction D1.5: Hybrid data-driven with soft physics awareness.
+
+    Key differences vs Direction D:
+    - Optional 6D rotation representation for smoother attitude predictions.
+    - Optional structural enforcement of mass monotonicity (via softplus deltas).
+    - Designed to pair with soft physics residuals (implemented in the loss).
+    """
+
+    requires_initial_state = False
+
+    def __init__(
+        self,
+        context_dim: int,
+        fourier_features: int = 8,
+        context_embedding_dim: int = 32,
+        backbone_hidden_dims: list = None,
+        head_g3_hidden_dims: list = None,
+        head_g2_hidden_dims: list = None,
+        head_g1_hidden_dims: list = None,
+        activation: str = "gelu",
+        layer_norm: bool = True,
+        dropout: float = 0.0,
+        use_rotation_6d: bool = True,
+        enforce_mass_monotonicity: bool = False,
+    ):
+        super().__init__()
+
+        self.context_dim = context_dim
+        self.fourier_features = fourier_features
+        self.context_embedding_dim = context_embedding_dim
+        self.use_rotation_6d = use_rotation_6d
+        self.enforce_mass_monotonicity = enforce_mass_monotonicity
+
+        self.fourier_encoder = FourierFeatures(n_frequencies=fourier_features)
+        time_dim = 1 + 2 * fourier_features
+        self.context_encoder = ContextEncoder(
+            context_dim=context_dim,
+            embedding_dim=context_embedding_dim,
+            activation=activation,
+        )
+        feature_dim = time_dim + context_embedding_dim
+
+        if backbone_hidden_dims is None:
+            backbone_hidden_dims = [256, 256, 256, 256]
+        self.backbone = DirectionDPINN._build_mlp(
+            self,
+            input_dim=feature_dim,
+            hidden_dims=backbone_hidden_dims,
+            output_dim=backbone_hidden_dims[-1],
+            activation=activation,
+            layer_norm=layer_norm,
+            dropout=dropout,
+        )
+        latent_dim = backbone_hidden_dims[-1]
+
+        if head_g3_hidden_dims is None:
+            head_g3_hidden_dims = [128, 64]
+        self.head_g3 = DirectionDPINN._build_mlp(
+            self,
+            input_dim=latent_dim,
+            hidden_dims=head_g3_hidden_dims,
+            output_dim=1,
+            activation=activation,
+            layer_norm=layer_norm,
+            dropout=dropout,
+        )
+
+        if head_g2_hidden_dims is None:
+            head_g2_hidden_dims = [256, 128, 64]
+        g2_output_dim = 6 + 3 if use_rotation_6d else 7
+        self.head_g2 = DirectionDPINN._build_mlp(
+            self,
+            input_dim=latent_dim + 1,
+            hidden_dims=head_g2_hidden_dims,
+            output_dim=g2_output_dim,
+            activation=activation,
+            layer_norm=layer_norm,
+            dropout=dropout,
+        )
+
+        if head_g1_hidden_dims is None:
+            head_g1_hidden_dims = [256, 128, 128, 64]
+        self.head_g1 = DirectionDPINN._build_mlp(
+            self,
+            input_dim=latent_dim + 1 + 4 + 3,
+            hidden_dims=head_g1_hidden_dims,
+            output_dim=6,
+            activation=activation,
+            layer_norm=layer_norm,
+            dropout=dropout,
+        )
+
+    def _ensure_batched(
+        self, t: torch.Tensor, context: torch.Tensor
+    ) -> Tuple[torch.Tensor, torch.Tensor, bool]:
+        t_was_unbatched = False
+        context_was_unbatched = False
+
+        if t.dim() == 1:
+            t = t.unsqueeze(-1)
+        if t.dim() == 2:
+            t = t.unsqueeze(0)
+            t_was_unbatched = True
+
+        if context.dim() == 1:
+            context = context.unsqueeze(0)
+            context_was_unbatched = True
+
+        return t, context, t_was_unbatched and context_was_unbatched
+
+    def forward(self, t: torch.Tensor, context: torch.Tensor) -> torch.Tensor:
+        t, context, was_unbatched = self._ensure_batched(t, context)
+        batch_size, N, _ = t.shape
+
+        fourier_t = self.fourier_encoder(t)
+
+        if context.dim() == 2:
+            context_expanded = context.unsqueeze(1).expand(batch_size, N, -1)
+        elif context.dim() == 3 and context.shape[1] == 1:
+            context_expanded = context.expand(batch_size, N, -1)
+        else:
+            context_expanded = context
+
+        context_embed = self.context_encoder(context_expanded)
+        features = torch.cat([fourier_t, context_embed], dim=-1)
+        latent = self.backbone(features)
+
+        m_pred_raw = self.head_g3(latent)
+        if self.enforce_mass_monotonicity:
+            mass_delta = -F.softplus(m_pred_raw)
+            m0 = context_expanded[..., 0:1]
+            m_pred = torch.cumsum(mass_delta, dim=1) + m0
+        else:
+            m_pred = m_pred_raw
+
+        att_input = torch.cat([latent, m_pred], dim=-1)
+        att_output = self.head_g2(att_input)
+
+        if self.use_rotation_6d:
+            sixd_rot = att_output[..., :6]
+            w_pred = att_output[..., 6:]
+            R = sixd_to_rotation_matrix(sixd_rot)
+            q_pred = rotation_matrix_to_quaternion(R)
+        else:
+            q_pred = att_output[..., :4]
+            q_pred = normalize_quaternion(q_pred)
+            w_pred = att_output[..., 4:]
+
+        trans_input = torch.cat([latent, m_pred, q_pred, w_pred], dim=-1)
+        trans_output = self.head_g1(trans_input)
+        x_pred = trans_output[..., :3]
+        v_pred = trans_output[..., 3:]
+
+        state = torch.cat([x_pred, v_pred, q_pred, w_pred, m_pred], dim=-1)
+
+        if was_unbatched:
+            state = state.squeeze(0)
+        return state
+
+    def predict_trajectory(self, t: torch.Tensor, context: torch.Tensor) -> torch.Tensor:
+        return self.forward(t, context)
 
 
 class TemporalIntegrator(nn.Module):

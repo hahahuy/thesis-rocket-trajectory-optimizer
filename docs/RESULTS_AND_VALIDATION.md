@@ -460,6 +460,17 @@ WP4 models are validated using:
 4. **Hybrid C-series (exp3-5)** remain unstable without additional physics or integration upgrades.
 5. **Weighted-loss approach (exp4)** confirms penalties alone cannot fix mass/rotation issues.
 
+### Upcoming: Direction D1.5 (exp8)
+
+- **Configuration**: `configs/train_direction_d15.yaml`
+- **Status**: 🔄 queued (training scheduled after D1 diagnostics).
+- **Highlights**:
+  - Shared backbone + dependency heads (mass → attitude → translation), optional 6D rotation head.
+  - Optional structural mass monotonicity seeded from context `m₀`.
+  - Soft physics residuals (mass ODE + vertical drag/thrust) and curvature penalties applied via loss.
+  - Two-phase schedule: first 75% epochs data-only; final 25% ramp λ_mass/λ_vz to 0.05, smoothing to 1e-4.
+- **Goal**: Retain Direction D accuracy (≤0.30 RMSE) while smoothing altitude/velocity traces and maintaining realistic mass burn.
+
 ---
 
 ## References

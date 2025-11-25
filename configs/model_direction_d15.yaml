@@ -1,0 +1,25 @@
+model:
+  type: direction_d15
+
+  # Feature encoding
+  fourier_features: 8
+  context_embedding_dim: 32
+
+  # Shared backbone
+  backbone_hidden_dims: [256, 256, 256, 256]
+
+  # Head architectures
+  head_g3_hidden_dims: [128, 64]
+  head_g2_hidden_dims: [256, 128, 64]
+  head_g1_hidden_dims: [256, 128, 128, 64]
+
+  # Activation and regularization
+  activation: gelu
+  layer_norm: true
+  dropout: 0.0
+
+  # Direction D1.5 options
+  use_rotation_6d: true
+  enforce_mass_monotonicity: false
+
+

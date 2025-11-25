@@ -4,6 +4,7 @@ Main training loop for PINN model.
 
 import argparse
 import json
+import math
 import re
 from datetime import datetime
 from pathlib import Path
@@ -118,6 +119,70 @@ def _next_experiment_index(root_dir: Path) -> int:
     return max(indices, default=0) + 1
 
 
+class SoftLossScheduler:
+    """
+    Handles two-phase training for soft physics / smoothing losses (Direction D1.5).
+    """
+
+    def __init__(
+        self,
+        loss_fn: PINNLoss,
+        schedule_cfg: Dict,
+        total_epochs: int,
+    ) -> None:
+        self.loss_fn = loss_fn
+        self.enabled = bool(schedule_cfg.get("enabled", False))
+        self.total_epochs = max(1, int(total_epochs))
+        if not self.enabled:
+            self.keys = []
+            return
+
+        phase_ratio = safe_float(schedule_cfg.get("phase1_ratio"), 0.75)
+        if phase_ratio is None:
+            phase_ratio = 0.75
+        phase_ratio = min(max(phase_ratio, 0.0), 1.0)
+        self.phase_start = int(self.total_epochs * phase_ratio)
+        self.ramp_type = schedule_cfg.get("ramp", "linear").lower()
+
+        self.keys = [
+            "lambda_mass_residual",
+            "lambda_vz_residual",
+            "lambda_vxy_residual",
+            "lambda_smooth_z",
+            "lambda_smooth_vz",
+            "lambda_pos_vel",
+            "lambda_smooth_pos",
+        ]
+        self.targets = {
+            key: float(getattr(self.loss_fn, key, 0.0)) for key in self.keys
+        }
+        # Initialize weights for phase 1
+        initial_scale = 0.0 if self.phase_start > 0 else 1.0
+        self._set_scale(initial_scale)
+
+    def _set_scale(self, scale: float) -> None:
+        if not self.enabled:
+            return
+        for key in self.keys:
+            if hasattr(self.loss_fn, key):
+                setattr(self.loss_fn, key, self.targets[key] * scale)
+
+    def update(self, epoch: int) -> None:
+        if not self.enabled:
+            return
+        if epoch < self.phase_start:
+            self._set_scale(0.0)
+            return
+        # Handle short schedules (phase_start near total_epochs)
+        remaining = max(1, self.total_epochs - self.phase_start)
+        progress = min(max((epoch - self.phase_start) / remaining, 0.0), 1.0)
+        if self.ramp_type == "cosine":
+            scale = 0.5 * (1.0 - math.cos(math.pi * progress))
+        else:
+            scale = progress
+        self._set_scale(scale)
+
+
 def train_epoch(
     model: nn.Module,
     train_loader,
@@ -125,12 +190,21 @@ def train_epoch(
     optimizer: torch.optim.Optimizer,
     device: torch.device,
     epoch: int,
-    weight_scheduler: Optional[LossWeightScheduler] = None
+    weight_scheduler: Optional[LossWeightScheduler] = None,
 ) -> Dict[str, float]:
     """Train for one epoch."""
     model.train()
     total_loss = 0.0
-    loss_components = {"data": 0.0, "physics": 0.0, "boundary": 0.0}
+    loss_components = {
+        "data": 0.0,
+        "physics": 0.0,
+        "boundary": 0.0,
+        "mass_residual": 0.0,
+        "vz_residual": 0.0,
+        "vxy_residual": 0.0,
+        "smooth_z": 0.0,
+        "smooth_vz": 0.0,
+    }
     n_batches = 0
     
     # Update loss weights if scheduler provided
@@ -152,9 +226,9 @@ def train_epoch(
         # Forward pass
         optimizer.zero_grad()
         state_pred = _forward_with_initial_state_if_needed(model, t, context, state_true)
-        
+
         # Compute loss
-        loss, loss_dict = loss_fn(state_pred, state_true, t)
+        loss, loss_dict = loss_fn(state_pred, state_true, t, context=context)
         
         # Backward pass
         loss.backward()
@@ -167,7 +241,13 @@ def train_epoch(
         # Accumulate losses
         total_loss += loss.item()
         for key in loss_components:
-            loss_components[key] += loss_dict[key].item()
+            value = loss_dict.get(key)
+            if value is None:
+                continue
+            if isinstance(value, torch.Tensor):
+                loss_components[key] += value.item()
+            else:
+                loss_components[key] += float(value)
         n_batches += 1
     
     return {
@@ -186,7 +266,16 @@ def validate(
     """Validate model."""
     model.eval()
     total_loss = 0.0
-    loss_components = {"data": 0.0, "physics": 0.0, "boundary": 0.0}
+    loss_components = {
+        "data": 0.0,
+        "physics": 0.0,
+        "boundary": 0.0,
+        "mass_residual": 0.0,
+        "vz_residual": 0.0,
+        "vxy_residual": 0.0,
+        "smooth_z": 0.0,
+        "smooth_vz": 0.0,
+    }
     n_batches = 0
     
     for batch in val_loader:
@@ -198,11 +287,17 @@ def validate(
             t = t.unsqueeze(-1)
         
         state_pred = _forward_with_initial_state_if_needed(model, t, context, state_true)
-        loss, loss_dict = loss_fn(state_pred, state_true, t)
-        
+        loss, loss_dict = loss_fn(state_pred, state_true, t, context=context)
+
         total_loss += loss.item()
         for key in loss_components:
-            loss_components[key] += loss_dict[key].item()
+            value = loss_dict.get(key)
+            if value is None:
+                continue
+            if isinstance(value, torch.Tensor):
+                loss_components[key] += value.item()
+            else:
+                loss_components[key] += float(value)
         n_batches += 1
     
     return {
@@ -347,6 +442,23 @@ def main():
             integration_method=model_cfg.get("integration_method", "rk4"),
             use_physics_aware=bool(model_cfg.get("use_physics_aware", True)),
         ).to(device)
+    elif model_type == "direction_d15":
+        from src.models.direction_d_pinn import DirectionDPINN_D15
+
+        model = DirectionDPINN_D15(
+            context_dim=context_dim,
+            fourier_features=int(model_cfg.get("fourier_features", 8)),
+            context_embedding_dim=int(model_cfg.get("context_embedding_dim", 32)),
+            backbone_hidden_dims=model_cfg.get("backbone_hidden_dims", [256, 256, 256, 256]),
+            head_g3_hidden_dims=model_cfg.get("head_g3_hidden_dims", [128, 64]),
+            head_g2_hidden_dims=model_cfg.get("head_g2_hidden_dims", [256, 128, 64]),
+            head_g1_hidden_dims=model_cfg.get("head_g1_hidden_dims", [256, 128, 128, 64]),
+            activation=model_cfg.get("activation", "gelu"),
+            layer_norm=bool(model_cfg.get("layer_norm", True)),
+            dropout=safe_float(model_cfg.get("dropout"), 0.0),
+            use_rotation_6d=bool(model_cfg.get("use_rotation_6d", True)),
+            enforce_mass_monotonicity=bool(model_cfg.get("enforce_mass_monotonicity", False)),
+        ).to(device)
     elif model_type == "latent_ode":
         from src.models.latent_ode import RocketLatentODEPINN
         model = RocketLatentODEPINN(
@@ -474,7 +586,8 @@ def main():
     else:
         raise ValueError(
             "Unknown model type: "
-            f"{model_type}. Supported: 'pinn', 'latent_ode', 'sequence', 'hybrid', 'hybrid_c1', 'hybrid_c2', 'hybrid_c3'"
+            f"{model_type}. Supported: 'pinn', 'latent_ode', 'sequence', 'hybrid', "
+            "'hybrid_c1', 'hybrid_c2', 'hybrid_c3', 'direction_d', 'direction_d1', 'direction_d15'"
         )
     
     print(f"Model parameters: {sum(p.numel() for p in model.parameters()):,}")
@@ -493,6 +606,13 @@ def main():
         lambda_translation=safe_float(loss_cfg.get("lambda_translation"), 1.0),
         lambda_rotation=safe_float(loss_cfg.get("lambda_rotation"), 1.0),
         lambda_mass=safe_float(loss_cfg.get("lambda_mass"), 1.0),
+        lambda_mass_residual=safe_float(loss_cfg.get("lambda_mass_residual"), 0.0),
+        lambda_vz_residual=safe_float(loss_cfg.get("lambda_vz_residual"), 0.0),
+        lambda_vxy_residual=safe_float(loss_cfg.get("lambda_vxy_residual"), 0.0),
+        lambda_smooth_z=safe_float(loss_cfg.get("lambda_smooth_z"), 0.0),
+        lambda_smooth_vz=safe_float(loss_cfg.get("lambda_smooth_vz"), 0.0),
+        lambda_pos_vel=safe_float(loss_cfg.get("lambda_pos_vel"), 0.0),
+        lambda_smooth_pos=safe_float(loss_cfg.get("lambda_smooth_pos"), 0.0),
     )
     
     # Create optimizer
@@ -553,6 +673,15 @@ def main():
             lambda_bc_final=safe_float(loss_cfg.get("lambda_bc"), 1.0),
             total_epochs=int(train_cfg.get("epochs", 100))
         )
+
+    phase_schedule_cfg = loss_cfg.get("phase_schedule")
+    soft_loss_scheduler = None
+    if phase_schedule_cfg and phase_schedule_cfg.get("enabled", False):
+        soft_loss_scheduler = SoftLossScheduler(
+            loss_fn=loss_fn,
+            schedule_cfg=phase_schedule_cfg,
+            total_epochs=int(train_cfg.get("epochs", 100)),
+        )
     
     # Resume from checkpoint if specified
     start_epoch = 0
@@ -566,6 +695,8 @@ def main():
     train_log = []
     
     for epoch in range(start_epoch, n_epochs):
+        if soft_loss_scheduler is not None:
+            soft_loss_scheduler.update(epoch)
         # Train
         train_losses = train_epoch(
             model, train_loader, loss_fn, optimizer, device, epoch, weight_scheduler

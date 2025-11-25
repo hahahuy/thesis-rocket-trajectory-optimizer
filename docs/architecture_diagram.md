@@ -391,6 +391,59 @@ graph TD
     style AE fill:#c8e6c9
 ```
 
+## Direction D1.5: Soft-Physics Dependency Backbone
+
+Adds light physics hints and optional structural constraints while keeping Direction D’s direct state predictions (no explicit integrator).
+
+```mermaid
+graph TD
+    A[t: batch×N×1] --> B[FourierFeatures<br/>8 freq → 17D]
+    C[context: batch×7] --> D[ContextEncoder<br/>7→32, GELU]
+    B --> E[t_emb]
+    D --> F[ctx_emb]
+    E --> G[Concat]
+    F --> G
+    G --> H[Shared Backbone<br/>MLP 4×256]
+
+    H --> I[G3 Mass Head]
+    C --> J[m0 context] 
+    I --> K[m_pred]
+    J --> K
+    K --> L[Monotonic optional<br/>cumsum(-softplus)]
+
+    H --> M[latent copy]
+    L --> N[m copy]
+    M --> O
+    N --> O
+    O --> P[G2 Head<br/>6D rot (optional) + ω]
+    P --> Q[6D→quat || normalize q]
+
+    H --> R[latent copy₂]
+    L --> S
+    Q --> T
+    P --> U
+    R --> V[Concat latent || m || q || ω]
+    S --> V
+    T --> V
+    U --> V
+    V --> W[G1 Translation Head]
+
+    W --> X[translation]
+    Q --> Y[rotation]
+    U --> Z[angular vel]
+    L --> AA[mass]
+    X --> AB[state]
+    Y --> AB
+    Z --> AB
+    AA --> AB
+
+    style H fill:#fff9c4
+    style I fill:#ffecb3
+    style P fill:#ffe0b2
+    style W fill:#ffccbc
+    style AB fill:#c8e6c9
+```
+
 ## Architecture Comparison Summary
 
 | Architecture | Key Features | RMSE (Typical) |

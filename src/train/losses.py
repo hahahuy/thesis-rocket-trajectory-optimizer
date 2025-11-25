@@ -41,6 +41,15 @@ class PINNLoss(nn.Module):
         lambda_translation: float = 1.0,
         lambda_rotation: float = 1.0,
         lambda_mass: float = 1.0,
+        # Soft physics + smoothing (Direction D1.5)
+        lambda_mass_residual: float = 0.0,
+        lambda_vz_residual: float = 0.0,
+        lambda_vxy_residual: float = 0.0,
+        lambda_smooth_z: float = 0.0,
+        lambda_smooth_vz: float = 0.0,
+        # Position-Velocity consistency + position smoothing (Direction D1.51)
+        lambda_pos_vel: float = 0.0,
+        lambda_smooth_pos: float = 0.0,
     ):
         super().__init__()
         
@@ -52,6 +61,13 @@ class PINNLoss(nn.Module):
         self.lambda_translation = lambda_translation
         self.lambda_rotation = lambda_rotation
         self.lambda_mass = lambda_mass
+        self.lambda_mass_residual = lambda_mass_residual
+        self.lambda_vz_residual = lambda_vz_residual
+        self.lambda_vxy_residual = lambda_vxy_residual
+        self.lambda_smooth_z = lambda_smooth_z
+        self.lambda_smooth_vz = lambda_smooth_vz
+        self.lambda_pos_vel = lambda_pos_vel
+        self.lambda_smooth_pos = lambda_smooth_pos
         
         self.physics_params = physics_params or {}
         self.scales = scales or {}
@@ -82,6 +98,8 @@ class PINNLoss(nn.Module):
             k: torch.tensor(v, dtype=torch.float32)
             for k, v in self.physics_params.items()
         }
+
+        self._eps = 1e-8
     
     def data_loss(
         self,
@@ -119,6 +137,207 @@ class PINNLoss(nn.Module):
         mass_loss = torch.mean(weighted_errors[:, :, 13:14]) * self.lambda_mass
         
         return translation_loss + rotation_loss + mass_loss
+
+    def _broadcast_context(
+        self,
+        context: Optional[torch.Tensor],
+        batch_size: int,
+        N: int,
+        device: torch.device,
+    ) -> Optional[torch.Tensor]:
+        if context is None:
+            return None
+        if context.dim() == 1:
+            context = context.unsqueeze(0)
+        if context.dim() == 2:
+            context = context.unsqueeze(1).expand(batch_size, N, -1)
+        elif context.dim() == 3 and context.shape[1] == 1:
+            context = context.expand(batch_size, N, -1)
+        return context.to(device)
+
+    def _finite_difference(
+        self,
+        values: torch.Tensor,
+        t: torch.Tensor,
+    ) -> torch.Tensor:
+        # values: [batch, N, d], t: [batch, N, 1]
+        batch, N, d = values.shape
+        if N < 2:
+            return torch.zeros_like(values)
+        diffs = torch.zeros_like(values)
+        dt = t[:, 1:, 0] - t[:, :-1, 0]  # [batch, N-1]
+        dt = dt.clamp_min(self._eps).unsqueeze(-1)
+        diffs[:, :-1, :] = (values[:, 1:, :] - values[:, :-1, :]) / dt
+        diffs[:, -1, :] = diffs[:, -2, :]
+        return diffs
+
+    def _second_difference(
+        self,
+        values: torch.Tensor,
+    ) -> torch.Tensor:
+        if values.shape[1] < 3:
+            return torch.zeros(1, device=values.device, dtype=values.dtype)
+        second = values[:, 2:, :] - 2.0 * values[:, 1:-1, :] + values[:, :-2, :]
+        return torch.mean(second ** 2)
+
+    def _position_velocity_consistency_loss(
+        self,
+        state: torch.Tensor,
+        t: torch.Tensor,
+    ) -> torch.Tensor:
+        """
+        Position-Velocity Consistency Loss (PV-Loss).
+        
+        Enforces discrete motion update: p(t+1) ≈ p(t) + v(t) * Δt
+        
+        Args:
+            state: [batch, N, 14] - predicted state
+            t: [batch, N, 1] - time grid
+            
+        Returns:
+            Scalar loss
+        """
+        # Extract positions: [batch, N, 3] (x, y, z)
+        positions = state[..., 0:3]  # [batch, N, 3]
+        # Extract velocities: [batch, N, 3] (vx, vy, vz)
+        velocities = state[..., 3:6]  # [batch, N, 3]
+        
+        if positions.shape[1] < 2:
+            return torch.tensor(0.0, device=state.device, dtype=state.dtype)
+        
+        # Compute time differences: [batch, N-1]
+        dt = t[:, 1:, 0] - t[:, :-1, 0]  # [batch, N-1]
+        dt = dt.clamp_min(self._eps).unsqueeze(-1)  # [batch, N-1, 1]
+        
+        # Compute residuals: r = p(t+1) - p(t) - v(t) * Δt
+        # positions[:, 1:, :] - positions[:, :-1, :] gives p(t+1) - p(t)
+        # velocities[:, :-1, :] * dt gives v(t) * Δt
+        residual = (
+            positions[:, 1:, :] - positions[:, :-1, :] - velocities[:, :-1, :] * dt
+        )  # [batch, N-1, 3]
+        
+        # Loss: mean of squared residuals across all components
+        loss = torch.mean(residual ** 2)
+        return loss
+
+    def _position_smoothing_loss(
+        self,
+        state: torch.Tensor,
+    ) -> torch.Tensor:
+        """
+        Light Position Smoothing Loss (XSmooth-Loss).
+        
+        Penalizes high-frequency curvature in X/Y trajectories using second-order
+        discrete derivative (curvature): c(t) = x(t+1) - 2*x(t) + x(t-1)
+        
+        Args:
+            state: [batch, N, 14] - predicted state
+            
+        Returns:
+            Scalar loss (only for x and y, not z)
+        """
+        # Extract x and y positions: [batch, N, 2]
+        xy_positions = state[..., 0:2]  # [batch, N, 2]
+        
+        if xy_positions.shape[1] < 3:
+            return torch.tensor(0.0, device=state.device, dtype=state.dtype)
+        
+        # Compute curvature: c(t) = x(t+1) - 2*x(t) + x(t-1)
+        # For indices 1..N-2: curvature[:, i] = xy[:, i+1] - 2*xy[:, i] + xy[:, i-1]
+        curvature = (
+            xy_positions[:, 2:, :] - 2.0 * xy_positions[:, 1:-1, :] + xy_positions[:, :-2, :]
+        )  # [batch, N-2, 2]
+        
+        # Loss: mean of squared curvature
+        loss = torch.mean(curvature ** 2)
+        return loss
+
+    def _get_param(self, name: str, default: float) -> torch.Tensor:
+        if name in self._params_tensors:
+            return self._params_tensors[name]
+        return torch.tensor(default, dtype=torch.float32)
+
+    def _mass_residual_loss(
+        self,
+        state: torch.Tensor,
+        t: torch.Tensor,
+        context: torch.Tensor,
+    ) -> torch.Tensor:
+        # state: [batch, N, 14]
+        m = state[..., 13:14]
+        dm_dt = self._finite_difference(m, t)
+
+        Isp = context[..., 1:2]
+        Tmax = context[..., 5:6]
+        g0 = self._get_param("g0", 9.81).to(state.device)
+        g0 = g0.view(1, 1, 1)
+
+        expected = Tmax / (Isp.clamp_min(self._eps) * g0)
+        residual = dm_dt + expected
+        return torch.mean(residual ** 2)
+
+    def _drag_acc_component(
+        self,
+        velocity_component: torch.Tensor,
+        rho: torch.Tensor,
+        Cd: torch.Tensor,
+        S_ref: torch.Tensor,
+        mass: torch.Tensor,
+    ) -> torch.Tensor:
+        drag_force = 0.5 * rho * Cd * S_ref * velocity_component * torch.abs(velocity_component)
+        drag_acc = drag_force / mass.clamp_min(self._eps)
+        return drag_acc
+
+    def _compute_density(self, altitude: torch.Tensor) -> torch.Tensor:
+        rho0 = self._get_param("rho0", 1.225).to(altitude.device).view(1, 1, 1)
+        h_scale = self._get_param("h_scale", 8400.0).to(altitude.device).view(1, 1, 1)
+        return rho0 * torch.exp(-torch.clamp(altitude, min=0.0) / h_scale)
+
+    def _vertical_residual_loss(
+        self,
+        state: torch.Tensor,
+        t: torch.Tensor,
+        context: torch.Tensor,
+    ) -> torch.Tensor:
+        v = state[..., 3:6]
+        vz = v[..., 2:3]
+        dvz_dt = self._finite_difference(vz, t)
+
+        z = state[..., 2:3]
+        rho = self._compute_density(z)
+        Cd = context[..., 2:3]
+        S_ref = self._get_param("S_ref", 0.05).to(state.device).view(1, 1, 1)
+        mass = state[..., 13:14]
+
+        drag_acc_z = self._drag_acc_component(vz, rho, Cd, S_ref, mass)
+
+        g0 = self._get_param("g0", 9.81).to(state.device).view(1, 1, 1)
+        Tmax = context[..., 5:6]
+        thrust_acc = Tmax / mass.clamp_min(self._eps)
+        a_phys = thrust_acc - g0 - drag_acc_z
+        residual = dvz_dt - a_phys
+        return torch.mean(residual ** 2)
+
+    def _horizontal_residual_loss(
+        self,
+        state: torch.Tensor,
+        t: torch.Tensor,
+        context: torch.Tensor,
+    ) -> torch.Tensor:
+        v = state[..., 3:6]
+        dv_dt = self._finite_difference(v, t)
+        z = state[..., 2:3]
+        rho = self._compute_density(z)
+        Cd = context[..., 2:3]
+        S_ref = self._get_param("S_ref", 0.05).to(state.device).view(1, 1, 1)
+        mass = state[..., 13:14]
+
+        drag_ax = self._drag_acc_component(v[..., 0:1], rho, Cd, S_ref, mass)
+        drag_ay = self._drag_acc_component(v[..., 1:2], rho, Cd, S_ref, mass)
+
+        residual_x = dv_dt[..., 0:1] + drag_ax
+        residual_y = dv_dt[..., 1:2] + drag_ay
+        return torch.mean(residual_x ** 2 + residual_y ** 2)
     
     def physics_loss(
         self,
@@ -331,7 +550,8 @@ class PINNLoss(nn.Module):
         pred_state: torch.Tensor,
         true_state: torch.Tensor,
         t: torch.Tensor,
-        control: Optional[torch.Tensor] = None
+        control: Optional[torch.Tensor] = None,
+        context: Optional[torch.Tensor] = None,
     ) -> Tuple[torch.Tensor, Dict[str, torch.Tensor]]:
         """
         Compute total loss and component losses.
@@ -352,13 +572,76 @@ class PINNLoss(nn.Module):
         # Enhanced loss components
         L_quat_norm = self.quaternion_normalization_loss(pred_state)
         L_mass_flow = self.mass_flow_consistency_loss(pred_state, t)
+
+        context_broadcast = None
+        if context is not None and (
+            self.lambda_mass_residual > 0
+            or self.lambda_vz_residual > 0
+            or self.lambda_vxy_residual > 0
+        ):
+            batch_size = pred_state.shape[0] if pred_state.dim() == 3 else 1
+            N = pred_state.shape[1] if pred_state.dim() == 3 else pred_state.shape[0]
+            context_broadcast = self._broadcast_context(
+                context, batch_size, N, pred_state.device
+            )
+
+        L_mass_residual = torch.tensor(0.0, device=pred_state.device)
+        L_vz_residual = torch.tensor(0.0, device=pred_state.device)
+        L_vxy_residual = torch.tensor(0.0, device=pred_state.device)
+        L_smooth_z = torch.tensor(0.0, device=pred_state.device)
+        L_smooth_vz = torch.tensor(0.0, device=pred_state.device)
+        L_pos_vel = torch.tensor(0.0, device=pred_state.device)
+        L_smooth_pos = torch.tensor(0.0, device=pred_state.device)
+
+        if (
+            self.lambda_mass_residual > 0.0
+            and context_broadcast is not None
+        ):
+            L_mass_residual = self._mass_residual_loss(
+                pred_state, t, context_broadcast
+            )
+
+        if (
+            self.lambda_vz_residual > 0.0
+            and context_broadcast is not None
+        ):
+            L_vz_residual = self._vertical_residual_loss(
+                pred_state, t, context_broadcast
+            )
+
+        if (
+            self.lambda_vxy_residual > 0.0
+            and context_broadcast is not None
+        ):
+            L_vxy_residual = self._horizontal_residual_loss(
+                pred_state, t, context_broadcast
+            )
+
+        if self.lambda_smooth_z > 0.0:
+            L_smooth_z = self._second_difference(pred_state[..., 2:3])
+
+        if self.lambda_smooth_vz > 0.0:
+            L_smooth_vz = self._second_difference(pred_state[..., 5:6])
+
+        if self.lambda_pos_vel > 0.0:
+            L_pos_vel = self._position_velocity_consistency_loss(pred_state, t)
+
+        if self.lambda_smooth_pos > 0.0:
+            L_smooth_pos = self._position_smoothing_loss(pred_state)
         
         total_loss = (
-            self.lambda_data * L_data +
-            self.lambda_phys * L_phys +
-            self.lambda_bc * L_bc +
-            self.lambda_quat_norm * L_quat_norm +
-            self.lambda_mass_flow * L_mass_flow
+            self.lambda_data * L_data
+            + self.lambda_phys * L_phys
+            + self.lambda_bc * L_bc
+            + self.lambda_quat_norm * L_quat_norm
+            + self.lambda_mass_flow * L_mass_flow
+            + self.lambda_mass_residual * L_mass_residual
+            + self.lambda_vz_residual * L_vz_residual
+            + self.lambda_vxy_residual * L_vxy_residual
+            + self.lambda_smooth_z * L_smooth_z
+            + self.lambda_smooth_vz * L_smooth_vz
+            + self.lambda_pos_vel * L_pos_vel
+            + self.lambda_smooth_pos * L_smooth_pos
         )
         
         loss_dict = {
@@ -367,7 +650,14 @@ class PINNLoss(nn.Module):
             "physics": L_phys,
             "boundary": L_bc,
             "quat_norm": L_quat_norm,
-            "mass_flow": L_mass_flow
+            "mass_flow": L_mass_flow,
+            "mass_residual": L_mass_residual,
+            "vz_residual": L_vz_residual,
+            "vxy_residual": L_vxy_residual,
+            "smooth_z": L_smooth_z,
+            "smooth_vz": L_smooth_vz,
+            "pos_vel": L_pos_vel,
+            "smooth_pos": L_smooth_pos,
         }
         
         return total_loss, loss_dict

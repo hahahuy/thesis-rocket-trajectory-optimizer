@@ -4,7 +4,7 @@ Neural network models for PINN training.
 
 from .pinn import PINN
 from .residual_net import ResidualNet
-from .direction_d_pinn import DirectionDPINN, DirectionDPINN_D1
+from .direction_d_pinn import DirectionDPINN, DirectionDPINN_D15, DirectionDPINN_D1
 from .latent_ode import (
     RocketLatentODEPINN,
     LatentDynamicsNet,
@@ -45,6 +45,7 @@ __all__ = [
     "PINN",
     "ResidualNet",
     "DirectionDPINN",
+    "DirectionDPINN_D15",
     "DirectionDPINN_D1",
     "RocketLatentODEPINN",
     "RocketSequencePINN",

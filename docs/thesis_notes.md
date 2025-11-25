@@ -1442,6 +1442,25 @@ context → ContextEncoder ----┤
 1. **Do we still need latent ODEs?** – D shows ≤0.30 RMSE with pure MLPs; we should benchmark against tuned C-series to decide.  
 2. **Mass Constraints** – Consider a softplus-constrained head to guarantee `ṁ ≤ 0`.  
 3. **Physics Iterations** – Feeding back integrated altitude/velocity into another physics pass could improve drag modeling.  
+
+---
+
+### 7.6 Direction D1.5 (Soft Physics Upgrade)
+
+- **Goal**: Blend Direction D accuracy with D1 smoothness without incurring D1’s integration bias.
+- **Architectural changes**:
+  - Shared backbone + dependency heads identical to Direction D.
+  - Optional 6D rotation head (default ON) with on-the-fly conversion back to quaternions.
+  - Optional monotonic mass reconstruction using context `m₀` + cumulative negative `softplus` deltas.
+- **Loss extensions**:
+  - Mass ODE residual: `dm/dt + T/(Isp g0)` using context `T_max`, `Isp`.
+  - Vertical drag/thrust residual: `dvz/dt - a_z^{phys}` with simple aero model (`rho(z)`, `Cd`).
+  - Optional horizontal drag residuals (light weight) + curvature penalties on `z` and `v_z`.
+- **Training schedule**:
+  - Phase 1 (70–80% epochs): data-only (all soft weights forced to 0).
+  - Phase 2: cosine ramp of λ_mass / λ_vz to 0.05, smoothing to 1e-4.
+  - Mass data component weight boosted (≈4×) to keep physics loss from flattening the burn profile.
+- **Expected outcome**: inherits D’s low bias while suppressing jagged altitude/velocity traces; retains compatibility with fast evaluation (no integrator, no latent dynamics).
 4. **Curriculum for Ordered Heads** – Because G1 depends on G2/G3, freezing G1 for a few epochs may stabilize early training.
 
 Direction D offers a low-latency alternative to the hybrid stack, while Direction D1 re-introduces physics structure without Shared Stem + Latent ODE overhead. Both will act as baselines for future Direction E ideas.

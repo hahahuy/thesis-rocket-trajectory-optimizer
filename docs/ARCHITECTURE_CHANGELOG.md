@@ -528,3 +528,37 @@ model:
 
 ---
 
+## [2025-11-25] Direction D1.5 – Soft-Physics Dependency Backbone
+
+### Added Files
+- **`configs/model_direction_d15.yaml`**, **`configs/train_direction_d15.yaml`**
+  - Baseline configuration + training recipe for D1.5 experiments.
+
+### Modified Files
+- **`src/models/direction_d_pinn.py`**
+  - Added `DirectionDPINN_D15` class (shared backbone + optional 6D rotation + mass monotonicity).
+- **`src/train/losses.py`**, **`src/train/train_pinn.py`**
+  - Loss extensions for soft physics residuals (mass/vz/vxy) and curvature smoothing.
+  - Two-phase scheduler to keep physics weights zero during Phase 1.
+- **`run_evaluation.py`**, **`src/models/__init__.py`**
+  - Model registry + evaluation support for `direction_d15`.
+- **`docs/architecture_diagram.md`**
+  - Added diagram for Direction D1.5.
+
+### Architecture Details
+- Keeps Direction D backbone (Fourier time encoder + context encoder + shared MLP + three heads).
+- Optional 6D rotation head (default ON) avoids quaternion normalization issues without needing the full D1 integrator.
+- Optional structural mass monotonicity: cumulative sum of negative `softplus` deltas anchored at context-provided `m0`.
+- Pairs with soft physics residuals (mass ODE + vertical dynamics) and light smoothing penalties applied in the loss, not the forward pass.
+- Two-phase training: first ~75% epochs data-only (physics/smoothing weights = 0), final 25% gradually ramp to low weights (λ ≈ 0.05, smoothing 1e-4).
+
+### Rationale
+- Direction D delivered low RMSE but noisy z/vz traces; Direction D1 was smoother but biased mass.
+- D1.5 keeps pure data predictions (no integrator) while letting the loss gently penalize non-physical trends, reducing noise without collapsing mass dynamics.
+
+### Status
+- ✅ Code integrated; ready for experiments (`exp8_direction_d15_soft_physics` planned).
+- ✅ Pending: long-run training/validation results + residual ablations. (best rmse result in every model, although performing position weirdly)
+
+---
+
