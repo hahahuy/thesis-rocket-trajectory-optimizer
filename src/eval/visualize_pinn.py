@@ -6,12 +6,12 @@ import numpy as np
 import matplotlib.pyplot as plt
 from mpl_toolkits.mplot3d import Axes3D
 from pathlib import Path
-from typing import Dict, Optional, Tuple
+from typing import Dict, Optional, Tuple, List
 
 import torch
 
 from src.models import PINN
-from src.data.preprocess import from_nd, Scales
+from src.data.preprocess import from_nd, Scales, CONTEXT_FIELDS
 
 
 def plot_trajectory_comparison(
@@ -226,13 +226,63 @@ def plot_trajectory_comparison(
     plt.close()
 
 
+def _denormalize_context_for_eval(
+    context: np.ndarray,
+    scales: Scales,
+    fields: Optional[List[str]] = None,
+) -> Dict[str, float]:
+    """
+    Denormalize context parameters for evaluation plots.
+
+    This is the inverse of src.data.preprocess.build_context_vector,
+    using the same physics-aware scaling.
+    """
+    if fields is None:
+        fields = CONTEXT_FIELDS
+
+    params: Dict[str, float] = {}
+    M_scale = scales.M
+    F_scale = scales.F
+    V_scale = scales.V
+    T_scale = scales.T
+
+    for i, field in enumerate(fields):
+        if i >= len(context):
+            break
+        val_norm = float(context[i])
+
+        if field in ["m0", "mdry"]:
+            val = val_norm * M_scale
+        elif field == "Tmax":
+            val = val_norm * F_scale
+        elif field == "Isp":
+            val = val_norm * 250.0  # Reference Isp
+        elif field in ["CL_alpha", "Cm_alpha", "Cd", "nmax"]:
+            val = val_norm  # Already O(1)
+        elif field == "rho0":
+            val = val_norm * 1.225
+        elif field == "H":
+            val = val_norm * 8500.0
+        elif field in ["wind_mag", "gust_amp"]:
+            val = val_norm * V_scale
+        elif field == "gust_freq":
+            val = val_norm / T_scale  # 1/T scale
+        else:
+            # Angles and others: keep as-is (radians)
+            val = val_norm
+        params[field] = val
+
+    return params
+
+
 def plot_3d_trajectory(
     t: np.ndarray,
     pred_state: np.ndarray,
     true_state: np.ndarray,
     scales: Scales,
+    context: Optional[np.ndarray] = None,
     save_path: Optional[str] = None,
-    title: str = "3D Trajectory Comparison"
+    title: str = "3D Trajectory Comparison",
 ):
     """
     Plot 3D trajectory visualization comparing predicted vs true paths.
@@ -268,14 +318,19 @@ def plot_3d_trajectory(
     y_pred = pred_state[:, 1] * scales.L / 1000
     z_pred = pred_state[:, 2] * scales.L / 1000
     
-    # Dimensionalize time
-    t_dim, _, _ = from_nd(true_state, np.zeros((len(t), 4)), t, scales)
+    # Dimensionalize time - compute directly to avoid shape issues
+    t_1d = t.flatten() if t.ndim > 1 else t
+    # Ensure t_1d has correct length
+    assert len(t_1d) == true_state.shape[0], \
+        f"Time length mismatch: t={len(t_1d)}, state={true_state.shape[0]}"
+    # Dimensionalize time directly: t_dim = t * T_scale
+    t_dim = t_1d * scales.T
     
     # Create figure with 3D subplot
-    fig = plt.figure(figsize=(16, 12))
+    fig = plt.figure(figsize=(18, 10))
     
     # Main 3D trajectory plot
-    ax1 = fig.add_subplot(2, 2, 1, projection='3d')
+    ax1 = fig.add_subplot(2, 3, 1, projection='3d')
     ax1.plot(x_true, y_true, z_true, 'b-', label='True', linewidth=2.5, alpha=0.9, zorder=2)
     ax1.plot(x_pred, y_pred, z_pred, 'r--', label='Predicted', linewidth=2, alpha=0.9, zorder=2)
     ax1.scatter(x_true[0], y_true[0], z_true[0], 
@@ -288,12 +343,11 @@ def plot_3d_trajectory(
     ax1.set_ylabel('Y [km]', fontsize=12, fontweight='bold')
     ax1.set_zlabel('Altitude [km]', fontsize=12, fontweight='bold')
     ax1.set_title('3D Trajectory', fontsize=14, fontweight='bold')
-    ax1.legend(loc='upper left', fontsize=10, framealpha=0.9)
     ax1.view_init(elev=20, azim=45)
     ax1.grid(True, alpha=0.3)
     
     # 2D Ground track (X-Y projection)
-    ax2 = fig.add_subplot(2, 2, 2)
+    ax2 = fig.add_subplot(2, 3, 2)
     ax2.plot(x_true, y_true, 'b-', label='True', linewidth=2.5, alpha=0.9, zorder=2)
     ax2.plot(x_pred, y_pred, 'r--', label='Predicted', linewidth=2, alpha=0.9, zorder=2)
     ax2.scatter(x_true[0], y_true[0], color='green', s=150, marker='o', 
@@ -303,7 +357,9 @@ def plot_3d_trajectory(
     ax2.set_xlabel('X [km]', fontsize=12, fontweight='bold')
     ax2.set_ylabel('Y [km]', fontsize=12, fontweight='bold')
     ax2.set_title('Ground Track (X-Y Projection)', fontsize=14, fontweight='bold')
-    ax2.legend(loc='best', fontsize=10, framealpha=0.9)
+    ax2.legend(loc='center', fontsize=10, framealpha=0.9, 
+               bbox_to_anchor=(0.45, 0.52), ncol=2, 
+               bbox_transform=fig.transFigure)
     ax2.set_aspect('equal', adjustable='box')
     ax2.grid(True, alpha=0.3, linestyle=':', linewidth=0.8)
     ax2.set_facecolor('#fafafa')
@@ -311,7 +367,7 @@ def plot_3d_trajectory(
     # Altitude vs Horizontal Distance
     horizontal_dist_true = np.sqrt(x_true**2 + y_true**2)
     horizontal_dist_pred = np.sqrt(x_pred**2 + y_pred**2)
-    ax3 = fig.add_subplot(2, 2, 3)
+    ax3 = fig.add_subplot(2, 3, 3)
     ax3.plot(horizontal_dist_true, z_true, 'b-', label='True', linewidth=2.5, alpha=0.9, zorder=2)
     ax3.plot(horizontal_dist_pred, z_pred, 'r--', label='Predicted', linewidth=2, alpha=0.9, zorder=2)
     ax3.set_xlabel('Horizontal Distance [km]', fontsize=12, fontweight='bold')
@@ -323,7 +379,7 @@ def plot_3d_trajectory(
     
     # Trajectory error (3D distance)
     error_3d = np.sqrt((x_pred - x_true)**2 + (y_pred - y_true)**2 + (z_pred - z_true)**2)
-    ax4 = fig.add_subplot(2, 2, 4)
+    ax4 = fig.add_subplot(2, 3, 4)
     ax4.plot(t_dim, error_3d, 'g-', linewidth=2, alpha=0.8, zorder=2)
     ax4.set_xlabel('Time [s]', fontsize=12, fontweight='bold')
     ax4.set_ylabel('3D Position Error [km]', fontsize=12, fontweight='bold')
@@ -335,10 +391,67 @@ def plot_3d_trajectory(
     ax4.grid(True, alpha=0.3, linestyle=':', linewidth=0.8)
     ax4.set_facecolor('#fafafa')
     
-    fig.suptitle(title, fontsize=16, fontweight='bold', y=0.995)
-    
-    # Use subplots_adjust for better control
-    plt.subplots_adjust(left=0.08, right=0.95, top=0.94, bottom=0.08, hspace=0.35, wspace=0.3)
+    # Subplot 5: Parameters & Summary (bottom middle)
+    ax5 = fig.add_subplot(2, 3, 5)
+    ax5.axis("off")
+
+    combined_text = ""
+
+    # Add initial parameters from context (if provided)
+    if context is not None:
+        params = _denormalize_context_for_eval(context, scales)
+        combined_text += "Initial Parameters:\n"
+        if "m0" in params:
+            combined_text += f"  m₀ = {params['m0']:.2f} kg\n"
+        if "Isp" in params:
+            combined_text += f"  Isp = {params['Isp']:.1f} s\n"
+        if "Cd" in params:
+            combined_text += f"  Cd = {params['Cd']:.3f}\n"
+        if "CL_alpha" in params:
+            combined_text += f"  CL_α = {params['CL_alpha']:.2f} 1/rad\n"
+        if "Cm_alpha" in params:
+            combined_text += f"  Cm_α = {params['Cm_alpha']:.2f} 1/rad\n"
+        if "Tmax" in params:
+            combined_text += f"  Tmax = {params['Tmax']:.0f} N\n"
+        if "wind_mag" in params:
+            combined_text += f"  wind = {params['wind_mag']:.1f} m/s\n"
+
+    # Add trajectory summary (always available)
+    duration = float(t_dim[-1] - t_dim[0])
+    max_alt = float(np.max(z_true))
+    max_range = float(np.max(np.sqrt(x_true**2 + y_true**2)))
+    impact_x = float(x_true[-1])
+    impact_y = float(y_true[-1])
+    impact_z = float(z_true[-1])
+
+    combined_text += "\nTrajectory Summary:\n"
+    combined_text += f"  Duration: {duration:.1f} s\n"
+    combined_text += f"  Max Altitude: {max_alt:.2f} km\n"
+    combined_text += f"  Max Range: {max_range:.2f} km\n"
+    combined_text += f"  Impact: ({impact_x:.2f}, {impact_y:.2f}, {impact_z:.3f}) km"
+
+    ax5.set_title("Parameters & Summary", fontsize=13, fontweight="bold", pad=5)
+    ax5.text(
+        0.5,
+        0.85,  # Position below title (title is at ~0.95, so 0.85 is below it)
+        combined_text,
+        transform=ax5.transAxes,
+        fontsize=11,
+        verticalalignment="top",
+        horizontalalignment="center",
+        bbox=dict(
+            boxstyle="round",
+            facecolor="wheat",
+            alpha=0.85,
+            edgecolor="black",
+            linewidth=2,
+            pad=3,
+        ),
+        family="monospace",
+        fontweight="bold",
+    )
+
+    fig.suptitle(title, fontsize=16, fontweight="bold", y=0.98)
     
     if save_path:
         plt.savefig(save_path, dpi=200, bbox_inches='tight', facecolor='white', edgecolor='none')

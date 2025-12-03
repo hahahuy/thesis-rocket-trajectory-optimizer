@@ -483,6 +483,39 @@ class DirectionDPINN_D15(nn.Module):
 
         return t, context, t_was_unbatched and context_was_unbatched
 
+    def _is_zero_aero(self, context: torch.Tensor, aero_tolerance: float = 1e-6) -> torch.Tensor:
+        """
+        Check if aero parameters are zero (or near zero).
+        
+        Args:
+            context: Context tensor [batch, N, context_dim] or [batch, context_dim]
+            aero_tolerance: Tolerance for considering aero parameters as zero
+            
+        Returns:
+            Boolean tensor indicating if aero is zero [batch, N] or [batch]
+        """
+        # Context fields order (from CONTEXT_FIELDS): 
+        # [m0, Isp, Cd, CL_alpha, Cm_alpha, S, l_ref, Tmax, mdry, ...]
+        # We check indices 2, 3, 4 for Cd, CL_alpha, Cm_alpha
+        # Also check for wind_mag if context_dim allows (typically index 17, but may not exist)
+        
+        if context.dim() == 2:
+            # [batch, context_dim]
+            cd = context[:, 2:3] if context.shape[1] > 2 else torch.zeros_like(context[:, 0:1])
+            cl_alpha = context[:, 3:4] if context.shape[1] > 3 else torch.zeros_like(context[:, 0:1])
+            cm_alpha = context[:, 4:5] if context.shape[1] > 4 else torch.zeros_like(context[:, 0:1])
+            # Check if all are near zero
+            aero_mag = torch.abs(cd) + torch.abs(cl_alpha) + torch.abs(cm_alpha)
+            return (aero_mag.squeeze(-1) < aero_tolerance)
+        else:
+            # [batch, N, context_dim]
+            cd = context[..., 2:3] if context.shape[-1] > 2 else torch.zeros_like(context[..., 0:1])
+            cl_alpha = context[..., 3:4] if context.shape[-1] > 3 else torch.zeros_like(context[..., 0:1])
+            cm_alpha = context[..., 4:5] if context.shape[-1] > 4 else torch.zeros_like(context[..., 0:1])
+            # Check if all are near zero
+            aero_mag = torch.abs(cd) + torch.abs(cl_alpha) + torch.abs(cm_alpha)
+            return (aero_mag.squeeze(-1) < aero_tolerance)
+
     def forward(self, t: torch.Tensor, context: torch.Tensor) -> torch.Tensor:
         t, context, was_unbatched = self._ensure_batched(t, context)
         batch_size, N, _ = t.shape
@@ -511,20 +544,66 @@ class DirectionDPINN_D15(nn.Module):
         att_input = torch.cat([latent, m_pred], dim=-1)
         att_output = self.head_g2(att_input)
 
+        # Check if aero is zero and force identity rotation if so
+        is_zero_aero = self._is_zero_aero(context_expanded)  # [batch, N]
+        
         if self.use_rotation_6d:
             sixd_rot = att_output[..., :6]
             w_pred = att_output[..., 6:]
+            
+            # Force identity 6D representation for zero-aero cases
+            # Identity rotation: r1=[1,0,0], r2=[0,1,0] -> 6D=[1,0,0,0,1,0]
+            identity_6d = torch.zeros_like(sixd_rot)
+            identity_6d[..., 0] = 1.0  # r1_x = 1
+            identity_6d[..., 4] = 1.0  # r2_y = 1
+            
+            # Apply mask: use identity_6d where is_zero_aero is True
+            is_zero_aero_expanded = is_zero_aero.unsqueeze(-1).expand_as(sixd_rot)  # [batch, N, 6]
+            sixd_rot = torch.where(is_zero_aero_expanded, identity_6d, sixd_rot)
+            
             R = sixd_to_rotation_matrix(sixd_rot)
             q_pred = rotation_matrix_to_quaternion(R)
+            
+            # Also force zero angular velocity for zero-aero
+            w_pred = torch.where(is_zero_aero.unsqueeze(-1).expand_as(w_pred), 
+                                torch.zeros_like(w_pred), w_pred)
         else:
             q_pred = att_output[..., :4]
             q_pred = normalize_quaternion(q_pred)
             w_pred = att_output[..., 4:]
+            
+            # Force identity quaternion for zero-aero cases
+            identity_q = torch.zeros_like(q_pred)
+            identity_q[..., 0] = 1.0  # q0 = 1, q1=q2=q3=0
+            is_zero_aero_expanded = is_zero_aero.unsqueeze(-1).expand_as(q_pred)  # [batch, N, 4]
+            q_pred = torch.where(is_zero_aero_expanded, identity_q, q_pred)
+            
+            # Also force zero angular velocity
+            w_pred = torch.where(is_zero_aero.unsqueeze(-1).expand_as(w_pred),
+                                torch.zeros_like(w_pred), w_pred)
 
         trans_input = torch.cat([latent, m_pred, q_pred, w_pred], dim=-1)
         trans_output = self.head_g1(trans_input)
         x_pred = trans_output[..., :3]
         v_pred = trans_output[..., 3:]
+        
+        # Force zero horizontal position/velocity for zero-aero cases
+        # Keep only vertical (z) component, zero out horizontal (x, y)
+        is_zero_aero_expanded_xy = is_zero_aero.unsqueeze(-1).expand(batch_size, N, 2)  # [batch, N, 2]
+        x_pred_horizontal = x_pred[..., :2]  # [batch, N, 2] (x, y)
+        x_pred_vertical = x_pred[..., 2:3]  # [batch, N, 1] (z)
+        x_pred_horizontal_zeroed = torch.where(is_zero_aero_expanded_xy, 
+                                               torch.zeros_like(x_pred_horizontal), 
+                                               x_pred_horizontal)
+        x_pred = torch.cat([x_pred_horizontal_zeroed, x_pred_vertical], dim=-1)
+        
+        # Also zero horizontal velocity
+        v_pred_horizontal = v_pred[..., :2]  # [batch, N, 2] (vx, vy)
+        v_pred_vertical = v_pred[..., 2:3]  # [batch, N, 1] (vz)
+        v_pred_horizontal_zeroed = torch.where(is_zero_aero_expanded_xy,
+                                              torch.zeros_like(v_pred_horizontal),
+                                              v_pred_horizontal)
+        v_pred = torch.cat([v_pred_horizontal_zeroed, v_pred_vertical], dim=-1)
 
         state = torch.cat([x_pred, v_pred, q_pred, w_pred, m_pred], dim=-1)
 

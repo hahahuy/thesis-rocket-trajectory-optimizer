@@ -1,0 +1,2758 @@
+[
+  {
+    "epoch": 1,
+    "train": {
+      "total": 105691.472652181,
+      "data": 105067.02228597006,
+      "physics": 6242.619114176432,
+      "boundary": 0.18914520343144733,
+      "mass_residual": 0.0,
+      "vz_residual": 0.0,
+      "vxy_residual": 0.0,
+      "smooth_z": 0.0,
+      "smooth_vz": 0.0
+    },
+    "val": {
+      "total": 245.57292683919272,
+      "data": 243.67059326171875,
+      "physics": 17.809106190999348,
+      "boundary": 0.12142864614725113,
+      "mass_residual": 0.0,
+      "vz_residual": 0.0,
+      "vxy_residual": 0.0,
+      "smooth_z": 0.0,
+      "smooth_vz": 0.0
+    },
+    "lr": 0.0009998288338252908
+  },
+  {
+    "epoch": 2,
+    "train": {
+      "total": 99.18325169881184,
+      "data": 98.1616589864095,
+      "physics": 9.07425750096639,
+      "boundary": 0.11416549781958261,
+      "mass_residual": 0.0,
+      "vz_residual": 0.0,
+      "vxy_residual": 0.0,
+      "smooth_z": 0.0,
+      "smooth_vz": 0.0
+    },
+    "val": {
+      "total": 22.142859141031902,
+      "data": 21.6349671681722,
+      "physics": 4.388182163238525,
+      "boundary": 0.06907411168018977,
+      "mass_residual": 0.0,
+      "vz_residual": 0.0,
+      "vxy_residual": 0.0,
+      "smooth_z": 0.0,
+      "smooth_vz": 0.0
+    },
+    "lr": 0.0009993154526099096
+  },
+  {
+    "epoch": 3,
+    "train": {
+      "total": 8.54614135424296,
+      "data": 8.103996737798054,
+      "physics": 2.5709927717844647,
+      "boundary": 0.18504544446865717,
+      "mass_residual": 0.0,
+      "vz_residual": 0.0,
+      "vxy_residual": 0.0,
+      "smooth_z": 0.0,
+      "smooth_vz": 0.0
+    },
+    "val": {
+      "total": 2.4086745977401733,
+      "data": 2.150713841120402,
+      "physics": 0.7518396774927775,
+      "boundary": 0.18277678887049356,
+      "mass_residual": 0.0,
+      "vz_residual": 0.0,
+      "vxy_residual": 0.0,
+      "smooth_z": 0.0,
+      "smooth_vz": 0.0
+    },
+    "lr": 0.0009984602081996976
+  },
+  {
+    "epoch": 4,
+    "train": {
+      "total": 1.882702930768331,
+      "data": 1.3255633195241292,
+      "physics": 1.0894229888916016,
+      "boundary": 0.4481973166267077,
+      "mass_residual": 0.0,
+      "vz_residual": 0.0,
+      "vxy_residual": 0.0,
+      "smooth_z": 0.0,
+      "smooth_vz": 0.0
+    },
+    "val": {
+      "total": 1.3901028037071228,
+      "data": 1.118815302848816,
+      "physics": 2.3692427476247153,
+      "boundary": 0.03436319281657537,
+      "mass_residual": 0.0,
+      "vz_residual": 0.0,
+      "vxy_residual": 0.0,
+      "smooth_z": 0.0,
+      "smooth_vz": 0.0
+    },
+    "lr": 0.0009972636867364526
+  },
+  {
+    "epoch": 5,
+    "train": {
+      "total": 0.9466683983802795,
+      "data": 0.5762825568517049,
+      "physics": 2.641740616162618,
+      "boundary": 0.10621179764469464,
+      "mass_residual": 0.0,
+      "vz_residual": 0.0,
+      "vxy_residual": 0.0,
+      "smooth_z": 0.0,
+      "smooth_vz": 0.0
+    },
+    "val": {
+      "total": 0.7404750188191732,
+      "data": 0.40056248009204865,
+      "physics": 3.158064047495524,
+      "boundary": 0.02410610392689705,
+      "mass_residual": 0.0,
+      "vz_residual": 0.0,
+      "vxy_residual": 0.0,
+      "smooth_z": 0.0,
+      "smooth_vz": 0.0
+    },
+    "lr": 0.0009957267082562184
+  },
+  {
+    "epoch": 6,
+    "train": {
+      "total": 0.6205126663049062,
+      "data": 0.32418946623802186,
+      "physics": 2.652445332209269,
+      "boundary": 0.031078665144741537,
+      "mass_residual": 0.0,
+      "vz_residual": 0.0,
+      "vxy_residual": 0.0,
+      "smooth_z": 0.0,
+      "smooth_vz": 0.0
+    },
+    "val": {
+      "total": 0.5621527433395386,
+      "data": 0.2662823100884755,
+      "physics": 2.6969993114471436,
+      "boundary": 0.02617049403488636,
+      "mass_residual": 0.0,
+      "vz_residual": 0.0,
+      "vxy_residual": 0.0,
+      "smooth_z": 0.0,
+      "smooth_vz": 0.0
+    },
+    "lr": 0.0009938503261272714
+  },
+  {
+    "epoch": 7,
+    "train": {
+      "total": 0.5245985150337219,
+      "data": 0.2335680405298869,
+      "physics": 2.7049556732177735,
+      "boundary": 0.020534910696248212,
+      "mass_residual": 0.0,
+      "vz_residual": 0.0,
+      "vxy_residual": 0.0,
+      "smooth_z": 0.0,
+      "smooth_vz": 0.0
+    },
+    "val": {
+      "total": 0.5977977712949117,
+      "data": 0.2951563000679016,
+      "physics": 2.7177419662475586,
+      "boundary": 0.030867261812090874,
+      "mass_residual": 0.0,
+      "vz_residual": 0.0,
+      "vxy_residual": 0.0,
+      "smooth_z": 0.0,
+      "smooth_vz": 0.0
+    },
+    "lr": 0.0009916358263281954
+  },
+  {
+    "epoch": 8,
+    "train": {
+      "total": 0.5104987462361653,
+      "data": 0.23429913818836212,
+      "physics": 2.5581846396128336,
+      "boundary": 0.020381135245164234,
+      "mass_residual": 0.0,
+      "vz_residual": 0.0,
+      "vxy_residual": 0.0,
+      "smooth_z": 0.0,
+      "smooth_vz": 0.0
+    },
+    "val": {
+      "total": 0.5907941361268362,
+      "data": 0.3182757943868637,
+      "physics": 2.6327051321665444,
+      "boundary": 0.009247816478212675,
+      "mass_residual": 0.0,
+      "vz_residual": 0.0,
+      "vxy_residual": 0.0,
+      "smooth_z": 0.0,
+      "smooth_vz": 0.0
+    },
+    "lr": 0.000989084726566536
+  },
+  {
+    "epoch": 9,
+    "train": {
+      "total": 0.5139140605926513,
+      "data": 0.22555861671765645,
+      "physics": 2.7251686096191405,
+      "boundary": 0.015838586476941904,
+      "mass_residual": 0.0,
+      "vz_residual": 0.0,
+      "vxy_residual": 0.0,
+      "smooth_z": 0.0,
+      "smooth_vz": 0.0
+    },
+    "val": {
+      "total": 0.5114424129327139,
+      "data": 0.20905925333499908,
+      "physics": 2.7641228834788003,
+      "boundary": 0.02597084144751231,
+      "mass_residual": 0.0,
+      "vz_residual": 0.0,
+      "vxy_residual": 0.0,
+      "smooth_z": 0.0,
+      "smooth_vz": 0.0
+    },
+    "lr": 0.0009861987752386395
+  },
+  {
+    "epoch": 10,
+    "train": {
+      "total": 0.4782150665918986,
+      "data": 0.19258188257614772,
+      "physics": 2.6613303820292153,
+      "boundary": 0.019500129297375678,
+      "mass_residual": 0.0,
+      "vz_residual": 0.0,
+      "vxy_residual": 0.0,
+      "smooth_z": 0.0,
+      "smooth_vz": 0.0
+    },
+    "val": {
+      "total": 0.5403661727905273,
+      "data": 0.28242485721906024,
+      "physics": 2.358616828918457,
+      "boundary": 0.022079627340038616,
+      "mass_residual": 0.0,
+      "vz_residual": 0.0,
+      "vxy_residual": 0.0,
+      "smooth_z": 0.0,
+      "smooth_vz": 0.0
+    },
+    "lr": 0.0009829799502313896
+  },
+  {
+    "epoch": 11,
+    "train": {
+      "total": 0.47997361421585083,
+      "data": 0.21824978689352673,
+      "physics": 2.4507838408152263,
+      "boundary": 0.016645442135632037,
+      "mass_residual": 0.0,
+      "vz_residual": 0.0,
+      "vxy_residual": 0.0,
+      "smooth_z": 0.0,
+      "smooth_vz": 0.0
+    },
+    "val": {
+      "total": 0.48552659153938293,
+      "data": 0.19255939622720084,
+      "physics": 2.8356828689575195,
+      "boundary": 0.009398910216987133,
+      "mass_residual": 0.0,
+      "vz_residual": 0.0,
+      "vxy_residual": 0.0,
+      "smooth_z": 0.0,
+      "smooth_vz": 0.0
+    },
+    "lr": 0.0009794304575666624
+  },
+  {
+    "epoch": 12,
+    "train": {
+      "total": 0.45824384888013203,
+      "data": 0.17394573589166004,
+      "physics": 2.6746231396993,
+      "boundary": 0.016835796212156615,
+      "mass_residual": 0.0,
+      "vz_residual": 0.0,
+      "vxy_residual": 0.0,
+      "smooth_z": 0.0,
+      "smooth_vz": 0.0
+    },
+    "val": {
+      "total": 0.46775051951408386,
+      "data": 0.1921569580833117,
+      "physics": 2.554511626561483,
+      "boundary": 0.020142386977871258,
+      "mass_residual": 0.0,
+      "vz_residual": 0.0,
+      "vxy_residual": 0.0,
+      "smooth_z": 0.0,
+      "smooth_vz": 0.0
+    },
+    "lr": 0.0009755527298894293
+  },
+  {
+    "epoch": 13,
+    "train": {
+      "total": 0.4399186909198761,
+      "data": 0.1606830835342407,
+      "physics": 2.6270074367523195,
+      "boundary": 0.016534853726625443,
+      "mass_residual": 0.0,
+      "vz_residual": 0.0,
+      "vxy_residual": 0.0,
+      "smooth_z": 0.0,
+      "smooth_vz": 0.0
+    },
+    "val": {
+      "total": 0.46520723899205524,
+      "data": 0.14704875151316324,
+      "physics": 3.0640718936920166,
+      "boundary": 0.01175129134207964,
+      "mass_residual": 0.0,
+      "vz_residual": 0.0,
+      "vxy_residual": 0.0,
+      "smooth_z": 0.0,
+      "smooth_vz": 0.0
+    },
+    "lr": 0.0009713494248005432
+  },
+  {
+    "epoch": 14,
+    "train": {
+      "total": 0.44562936027844746,
+      "data": 0.15493589490652085,
+      "physics": 2.7493640899658205,
+      "boundary": 0.0157570476954182,
+      "mass_residual": 0.0,
+      "vz_residual": 0.0,
+      "vxy_residual": 0.0,
+      "smooth_z": 0.0,
+      "smooth_vz": 0.0
+    },
+    "val": {
+      "total": 0.48634056250254315,
+      "data": 0.21082531909147897,
+      "physics": 2.636236588160197,
+      "boundary": 0.011891587016483149,
+      "mass_residual": 0.0,
+      "vz_residual": 0.0,
+      "vxy_residual": 0.0,
+      "smooth_z": 0.0,
+      "smooth_vz": 0.0
+    },
+    "lr": 0.0009668234230353522
+  },
+  {
+    "epoch": 15,
+    "train": {
+      "total": 0.4277547220389048,
+      "data": 0.14878349006175995,
+      "physics": 2.6445336818695067,
+      "boundary": 0.014517858562370142,
+      "mass_residual": 0.0,
+      "vz_residual": 0.0,
+      "vxy_residual": 0.0,
+      "smooth_z": 0.0,
+      "smooth_vz": 0.0
+    },
+    "val": {
+      "total": 0.44609564542770386,
+      "data": 0.1437329426407814,
+      "physics": 2.8485583464304605,
+      "boundary": 0.017506850883364677,
+      "mass_residual": 0.0,
+      "vz_residual": 0.0,
+      "vxy_residual": 0.0,
+      "smooth_z": 0.0,
+      "smooth_vz": 0.0
+    },
+    "lr": 0.0009619778264893877
+  },
+  {
+    "epoch": 16,
+    "train": {
+      "total": 0.4351802746454875,
+      "data": 0.14954140285650888,
+      "physics": 2.680253251393636,
+      "boundary": 0.01761354049667716,
+      "mass_residual": 0.0,
+      "vz_residual": 0.0,
+      "vxy_residual": 0.0,
+      "smooth_z": 0.0,
+      "smooth_vz": 0.0
+    },
+    "val": {
+      "total": 0.46119656165440875,
+      "data": 0.1324602613846461,
+      "physics": 3.1396230856577554,
+      "boundary": 0.01477399996171395,
+      "mass_residual": 0.0,
+      "vz_residual": 0.0,
+      "vxy_residual": 0.0,
+      "smooth_z": 0.0,
+      "smooth_vz": 0.0
+    },
+    "lr": 0.000956815956092479
+  },
+  {
+    "epoch": 17,
+    "train": {
+      "total": 0.43334981203079226,
+      "data": 0.14348250180482863,
+      "physics": 2.74109099706014,
+      "boundary": 0.015758198934296766,
+      "mass_residual": 0.0,
+      "vz_residual": 0.0,
+      "vxy_residual": 0.0,
+      "smooth_z": 0.0,
+      "smooth_vz": 0.0
+    },
+    "val": {
+      "total": 0.4494372308254242,
+      "data": 0.16875350226958594,
+      "physics": 2.611126661300659,
+      "boundary": 0.019571062177419662,
+      "mass_residual": 0.0,
+      "vz_residual": 0.0,
+      "vxy_residual": 0.0,
+      "smooth_z": 0.0,
+      "smooth_vz": 0.0
+    },
+    "lr": 0.0009513413495327554
+  },
+  {
+    "epoch": 18,
+    "train": {
+      "total": 0.4271915117899577,
+      "data": 0.14337279498577118,
+      "physics": 2.6724427223205565,
+      "boundary": 0.016574434315164883,
+      "mass_residual": 0.0,
+      "vz_residual": 0.0,
+      "vxy_residual": 0.0,
+      "smooth_z": 0.0,
+      "smooth_vz": 0.0
+    },
+    "val": {
+      "total": 0.4653720160325368,
+      "data": 0.1943260133266449,
+      "physics": 2.557248592376709,
+      "boundary": 0.015321142040193081,
+      "mass_residual": 0.0,
+      "vz_residual": 0.0,
+      "vxy_residual": 0.0,
+      "smooth_z": 0.0,
+      "smooth_vz": 0.0
+    },
+    "lr": 0.0009455577588320897
+  },
+  {
+    "epoch": 19,
+    "train": {
+      "total": 0.4258229990800222,
+      "data": 0.146305942038695,
+      "physics": 2.6368968804677326,
+      "boundary": 0.01582736112177372,
+      "mass_residual": 0.0,
+      "vz_residual": 0.0,
+      "vxy_residual": 0.0,
+      "smooth_z": 0.0,
+      "smooth_vz": 0.0
+    },
+    "val": {
+      "total": 0.46608826518058777,
+      "data": 0.1496186504761378,
+      "physics": 2.9067707856496177,
+      "boundary": 0.025792541603247326,
+      "mass_residual": 0.0,
+      "vz_residual": 0.0,
+      "vxy_residual": 0.0,
+      "smooth_z": 0.0,
+      "smooth_vz": 0.0
+    },
+    "lr": 0.0009394691477746516
+  },
+  {
+    "epoch": 20,
+    "train": {
+      "total": 0.42505985299746196,
+      "data": 0.1389310449361801,
+      "physics": 2.6938345114390057,
+      "boundary": 0.01674535678078731,
+      "mass_residual": 0.0,
+      "vz_residual": 0.0,
+      "vxy_residual": 0.0,
+      "smooth_z": 0.0,
+      "smooth_vz": 0.0
+    },
+    "val": {
+      "total": 0.47540239493052167,
+      "data": 0.14624719570080438,
+      "physics": 3.123687744140625,
+      "boundary": 0.01678641823430856,
+      "mass_residual": 0.0,
+      "vz_residual": 0.0,
+      "vxy_residual": 0.0,
+      "smooth_z": 0.0,
+      "smooth_vz": 0.0
+    },
+    "lr": 0.0009330796891903272
+  },
+  {
+    "epoch": 21,
+    "train": {
+      "total": 0.4252937416235606,
+      "data": 0.14518108914295833,
+      "physics": 2.6503446737925214,
+      "boundary": 0.015078180842101574,
+      "mass_residual": 0.0,
+      "vz_residual": 0.0,
+      "vxy_residual": 0.0,
+      "smooth_z": 0.0,
+      "smooth_vz": 0.0
+    },
+    "val": {
+      "total": 0.4360435704390208,
+      "data": 0.16142420967419943,
+      "physics": 2.5768467585245767,
+      "boundary": 0.01693467361231645,
+      "mass_residual": 0.0,
+      "vz_residual": 0.0,
+      "vxy_residual": 0.0,
+      "smooth_z": 0.0,
+      "smooth_vz": 0.0
+    },
+    "lr": 0.000926393762094869
+  },
+  {
+    "epoch": 22,
+    "train": {
+      "total": 0.4149130801359812,
+      "data": 0.1398676186800003,
+      "physics": 2.588412380218506,
+      "boundary": 0.0162042240301768,
+      "mass_residual": 0.0,
+      "vz_residual": 0.0,
+      "vxy_residual": 0.0,
+      "smooth_z": 0.0,
+      "smooth_vz": 0.0
+    },
+    "val": {
+      "total": 0.4376858075459798,
+      "data": 0.16611364483833313,
+      "physics": 2.537315011024475,
+      "boundary": 0.01784066917995612,
+      "mass_residual": 0.0,
+      "vz_residual": 0.0,
+      "vxy_residual": 0.0,
+      "smooth_z": 0.0,
+      "smooth_vz": 0.0
+    },
+    "lr": 0.0009194159486887393
+  },
+  {
+    "epoch": 23,
+    "train": {
+      "total": 0.41048638621966044,
+      "data": 0.1339863990743955,
+      "physics": 2.6036271731058758,
+      "boundary": 0.016137264234324298,
+      "mass_residual": 0.0,
+      "vz_residual": 0.0,
+      "vxy_residual": 0.0,
+      "smooth_z": 0.0,
+      "smooth_vz": 0.0
+    },
+    "val": {
+      "total": 0.4239763120810191,
+      "data": 0.15226469685633978,
+      "physics": 2.448381225268046,
+      "boundary": 0.026873485495646793,
+      "mass_residual": 0.0,
+      "vz_residual": 0.0,
+      "vxy_residual": 0.0,
+      "smooth_z": 0.0,
+      "smooth_vz": 0.0
+    },
+    "lr": 0.0009121510312166968
+  },
+  {
+    "epoch": 24,
+    "train": {
+      "total": 0.39576297799746196,
+      "data": 0.12306643923123678,
+      "physics": 2.56245276927948,
+      "boundary": 0.016451261254648367,
+      "mass_residual": 0.0,
+      "vz_residual": 0.0,
+      "vxy_residual": 0.0,
+      "smooth_z": 0.0,
+      "smooth_vz": 0.0
+    },
+    "val": {
+      "total": 0.42639246582984924,
+      "data": 0.1347387209534645,
+      "physics": 2.7687062422434487,
+      "boundary": 0.014783132510880629,
+      "mass_residual": 0.0,
+      "vz_residual": 0.0,
+      "vxy_residual": 0.0,
+      "smooth_z": 0.0,
+      "smooth_vz": 0.0
+    },
+    "lr": 0.0009046039886902862
+  },
+  {
+    "epoch": 25,
+    "train": {
+      "total": 0.3956508954366048,
+      "data": 0.1265032415588697,
+      "physics": 2.539829476674398,
+      "boundary": 0.015164702882369359,
+      "mass_residual": 0.0,
+      "vz_residual": 0.0,
+      "vxy_residual": 0.0,
+      "smooth_z": 0.0,
+      "smooth_vz": 0.0
+    },
+    "val": {
+      "total": 0.42113174001375836,
+      "data": 0.11462297787268956,
+      "physics": 2.953957955042521,
+      "boundary": 0.011112965953846773,
+      "mass_residual": 0.0,
+      "vz_residual": 0.0,
+      "vxy_residual": 0.0,
+      "smooth_z": 0.0,
+      "smooth_vz": 0.0
+    },
+    "lr": 0.0008967799934754719
+  },
+  {
+    "epoch": 26,
+    "train": {
+      "total": 0.4023955583572388,
+      "data": 0.126409017542998,
+      "physics": 2.597343325614929,
+      "boundary": 0.016252202478547893,
+      "mass_residual": 0.0,
+      "vz_residual": 0.0,
+      "vxy_residual": 0.0,
+      "smooth_z": 0.0,
+      "smooth_vz": 0.0
+    },
+    "val": {
+      "total": 0.4354393283526103,
+      "data": 0.14198982963959375,
+      "physics": 2.7877641518910727,
+      "boundary": 0.014673072223862013,
+      "mass_residual": 0.0,
+      "vz_residual": 0.0,
+      "vxy_residual": 0.0,
+      "smooth_z": 0.0,
+      "smooth_vz": 0.0
+    },
+    "lr": 0.0008886844077477569
+  },
+  {
+    "epoch": 27,
+    "train": {
+      "total": 0.39882727662722267,
+      "data": 0.12466382682323456,
+      "physics": 2.585708014170329,
+      "boundary": 0.015592641569674015,
+      "mass_residual": 0.0,
+      "vz_residual": 0.0,
+      "vxy_residual": 0.0,
+      "smooth_z": 0.0,
+      "smooth_vz": 0.0
+    },
+    "val": {
+      "total": 0.4302387436230977,
+      "data": 0.11449465155601501,
+      "physics": 2.929025093714396,
+      "boundary": 0.022841574003299076,
+      "mass_residual": 0.0,
+      "vz_residual": 0.0,
+      "vxy_residual": 0.0,
+      "smooth_z": 0.0,
+      "smooth_vz": 0.0
+    },
+    "lr": 0.0008803227798172155
+  },
+  {
+    "epoch": 28,
+    "train": {
+      "total": 0.40331041216850283,
+      "data": 0.13278629134098688,
+      "physics": 2.535075290997823,
+      "boundary": 0.017016583308577537,
+      "mass_residual": 0.0,
+      "vz_residual": 0.0,
+      "vxy_residual": 0.0,
+      "smooth_z": 0.0,
+      "smooth_vz": 0.0
+    },
+    "val": {
+      "total": 0.42412765820821124,
+      "data": 0.13566054900487265,
+      "physics": 2.7011536757151284,
+      "boundary": 0.018351750758786995,
+      "mass_residual": 0.0,
+      "vz_residual": 0.0,
+      "vxy_residual": 0.0,
+      "smooth_z": 0.0,
+      "smooth_vz": 0.0
+    },
+    "lr": 0.0008717008403259584
+  },
+  {
+    "epoch": 29,
+    "train": {
+      "total": 0.39179494778315227,
+      "data": 0.11685179571310679,
+      "physics": 2.592741584777832,
+      "boundary": 0.015668994933366775,
+      "mass_residual": 0.0,
+      "vz_residual": 0.0,
+      "vxy_residual": 0.0,
+      "smooth_z": 0.0,
+      "smooth_vz": 0.0
+    },
+    "val": {
+      "total": 0.430575688680013,
+      "data": 0.16680452227592468,
+      "physics": 2.5081550677617392,
+      "boundary": 0.012955642926196257,
+      "mass_residual": 0.0,
+      "vz_residual": 0.0,
+      "vxy_residual": 0.0,
+      "smooth_z": 0.0,
+      "smooth_vz": 0.0
+    },
+    "lr": 0.0008628244983206376
+  },
+  {
+    "epoch": 30,
+    "train": {
+      "total": 0.3868267158667246,
+      "data": 0.11649473607540131,
+      "physics": 2.5463375250498452,
+      "boundary": 0.015698221263786158,
+      "mass_residual": 0.0,
+      "vz_residual": 0.0,
+      "vxy_residual": 0.0,
+      "smooth_z": 0.0,
+      "smooth_vz": 0.0
+    },
+    "val": {
+      "total": 0.41140666604042053,
+      "data": 0.10251854608456294,
+      "physics": 2.927954832712809,
+      "boundary": 0.01609261737515529,
+      "mass_residual": 0.0,
+      "vz_residual": 0.0,
+      "vxy_residual": 0.0,
+      "smooth_z": 0.0,
+      "smooth_vz": 0.0
+    },
+    "lr": 0.0008536998372026804
+  },
+  {
+    "epoch": 31,
+    "train": {
+      "total": 0.38435449202855426,
+      "data": 0.11523411224285761,
+      "physics": 2.534814476966858,
+      "boundary": 0.015638936311006546,
+      "mass_residual": 0.0,
+      "vz_residual": 0.0,
+      "vxy_residual": 0.0,
+      "smooth_z": 0.0,
+      "smooth_vz": 0.0
+    },
+    "val": {
+      "total": 0.42831649382909137,
+      "data": 0.15889739493529,
+      "physics": 2.5554184516270957,
+      "boundary": 0.01387724932283163,
+      "mass_residual": 0.0,
+      "vz_residual": 0.0,
+      "vxy_residual": 0.0,
+      "smooth_z": 0.0,
+      "smooth_vz": 0.0
+    },
+    "lr": 0.00084433311055903
+  },
+  {
+    "epoch": 32,
+    "train": {
+      "total": 0.38825381398200987,
+      "data": 0.11822936038176218,
+      "physics": 2.5426504850387572,
+      "boundary": 0.01575940145800511,
+      "mass_residual": 0.0,
+      "vz_residual": 0.0,
+      "vxy_residual": 0.0,
+      "smooth_z": 0.0,
+      "smooth_vz": 0.0
+    },
+    "val": {
+      "total": 0.4090203046798706,
+      "data": 0.12211103737354279,
+      "physics": 2.674010435740153,
+      "boundary": 0.019508228326837223,
+      "mass_residual": 0.0,
+      "vz_residual": 0.0,
+      "vxy_residual": 0.0,
+      "smooth_z": 0.0,
+      "smooth_vz": 0.0
+    },
+    "lr": 0.0008347307378762496
+  },
+  {
+    "epoch": 33,
+    "train": {
+      "total": 0.3796920617421468,
+      "data": 0.11068097601334254,
+      "physics": 2.5214057763417563,
+      "boundary": 0.016870505859454474,
+      "mass_residual": 0.0,
+      "vz_residual": 0.0,
+      "vxy_residual": 0.0,
+      "smooth_z": 0.0,
+      "smooth_vz": 0.0
+    },
+    "val": {
+      "total": 0.40587229530016583,
+      "data": 0.11018140117327373,
+      "physics": 2.8120342095692954,
+      "boundary": 0.014487476088106632,
+      "mass_residual": 0.0,
+      "vz_residual": 0.0,
+      "vxy_residual": 0.0,
+      "smooth_z": 0.0,
+      "smooth_vz": 0.0
+    },
+    "lr": 0.0008248993001409267
+  },
+  {
+    "epoch": 34,
+    "train": {
+      "total": 0.38129677772521975,
+      "data": 0.11027992715438208,
+      "physics": 2.5564203103383383,
+      "boundary": 0.015374805778265,
+      "mass_residual": 0.0,
+      "vz_residual": 0.0,
+      "vxy_residual": 0.0,
+      "smooth_z": 0.0,
+      "smooth_vz": 0.0
+    },
+    "val": {
+      "total": 0.40563838680585224,
+      "data": 0.11898435900608699,
+      "physics": 2.6883174578348794,
+      "boundary": 0.017822285182774067,
+      "mass_residual": 0.0,
+      "vz_residual": 0.0,
+      "vxy_residual": 0.0,
+      "smooth_z": 0.0,
+      "smooth_vz": 0.0
+    },
+    "lr": 0.0008148455353293938
+  },
+  {
+    "epoch": 35,
+    "train": {
+      "total": 0.37679606874783833,
+      "data": 0.10310752044121424,
+      "physics": 2.5740957578023274,
+      "boundary": 0.016278968068460624,
+      "mass_residual": 0.0,
+      "vz_residual": 0.0,
+      "vxy_residual": 0.0,
+      "smooth_z": 0.0,
+      "smooth_vz": 0.0
+    },
+    "val": {
+      "total": 0.405824214220047,
+      "data": 0.12917673587799072,
+      "physics": 2.624180793762207,
+      "boundary": 0.014229390149315199,
+      "mass_residual": 0.0,
+      "vz_residual": 0.0,
+      "vxy_residual": 0.0,
+      "smooth_z": 0.0,
+      "smooth_vz": 0.0
+    },
+    "lr": 0.000804576333789856
+  },
+  {
+    "epoch": 36,
+    "train": {
+      "total": 0.37434863249460854,
+      "data": 0.10279193768898646,
+      "physics": 2.5587454319000242,
+      "boundary": 0.01568214185535908,
+      "mass_residual": 0.0,
+      "vz_residual": 0.0,
+      "vxy_residual": 0.0,
+      "smooth_z": 0.0,
+      "smooth_vz": 0.0
+    },
+    "val": {
+      "total": 0.4069821238517761,
+      "data": 0.1126664603749911,
+      "physics": 2.794384717941284,
+      "boundary": 0.014877204783260822,
+      "mass_residual": 0.0,
+      "vz_residual": 0.0,
+      "vxy_residual": 0.0,
+      "smooth_z": 0.0,
+      "smooth_vz": 0.0
+    },
+    "lr": 0.0007940987335200904
+  },
+  {
+    "epoch": 37,
+    "train": {
+      "total": 0.38500407139460247,
+      "data": 0.11281177550554275,
+      "physics": 2.5667148272196454,
+      "boundary": 0.015520812757313252,
+      "mass_residual": 0.0,
+      "vz_residual": 0.0,
+      "vxy_residual": 0.0,
+      "smooth_z": 0.0,
+      "smooth_vz": 0.0
+    },
+    "val": {
+      "total": 0.40558109680811566,
+      "data": 0.1352363551656405,
+      "physics": 2.557591358820597,
+      "boundary": 0.014585598992804686,
+      "mass_residual": 0.0,
+      "vz_residual": 0.0,
+      "vxy_residual": 0.0,
+      "smooth_z": 0.0,
+      "smooth_vz": 0.0
+    },
+    "lr": 0.000783419915343954
+  },
+  {
+    "epoch": 38,
+    "train": {
+      "total": 0.37688305576642356,
+      "data": 0.10502964605887731,
+      "physics": 2.5637569427490234,
+      "boundary": 0.015477707174917062,
+      "mass_residual": 0.0,
+      "vz_residual": 0.0,
+      "vxy_residual": 0.0,
+      "smooth_z": 0.0,
+      "smooth_vz": 0.0
+    },
+    "val": {
+      "total": 0.40361855427424115,
+      "data": 0.12180374314387639,
+      "physics": 2.581853707631429,
+      "boundary": 0.023629451170563698,
+      "mass_residual": 0.0,
+      "vz_residual": 0.0,
+      "vxy_residual": 0.0,
+      "smooth_z": 0.0,
+      "smooth_vz": 0.0
+    },
+    "lr": 0.0007725471979900061
+  },
+  {
+    "epoch": 39,
+    "train": {
+      "total": 0.3754015306631724,
+      "data": 0.10240980784098307,
+      "physics": 2.5702494780222573,
+      "boundary": 0.01596676738311847,
+      "mass_residual": 0.0,
+      "vz_residual": 0.0,
+      "vxy_residual": 0.0,
+      "smooth_z": 0.0,
+      "smooth_vz": 0.0
+    },
+    "val": {
+      "total": 0.39851251244544983,
+      "data": 0.10880736509958903,
+      "physics": 2.7269957065582275,
+      "boundary": 0.017005568991104763,
+      "mass_residual": 0.0,
+      "vz_residual": 0.0,
+      "vxy_residual": 0.0,
+      "smooth_z": 0.0,
+      "smooth_vz": 0.0
+    },
+    "lr": 0.0007614880330756164
+  },
+  {
+    "epoch": 40,
+    "train": {
+      "total": 0.3818077842394511,
+      "data": 0.11135217895110448,
+      "physics": 2.5329958756764728,
+      "boundary": 0.01715601732333501,
+      "mass_residual": 0.0,
+      "vz_residual": 0.0,
+      "vxy_residual": 0.0,
+      "smooth_z": 0.0,
+      "smooth_vz": 0.0
+    },
+    "val": {
+      "total": 0.41386348009109497,
+      "data": 0.12190625816583633,
+      "physics": 2.7727231979370117,
+      "boundary": 0.01468489101777474,
+      "mass_residual": 0.0,
+      "vz_residual": 0.0,
+      "vxy_residual": 0.0,
+      "smooth_z": 0.0,
+      "smooth_vz": 0.0
+    },
+    "lr": 0.0007502499999999999
+  },
+  {
+    "epoch": 41,
+    "train": {
+      "total": 0.38987053831418356,
+      "data": 0.11218453993399938,
+      "physics": 2.611255176862081,
+      "boundary": 0.016560471927126248,
+      "mass_residual": 0.0,
+      "vz_residual": 0.0,
+      "vxy_residual": 0.0,
+      "smooth_z": 0.0,
+      "smooth_vz": 0.0
+    },
+    "val": {
+      "total": 0.4013822078704834,
+      "data": 0.10116766641537349,
+      "physics": 2.8420334657033286,
+      "boundary": 0.016011197430392105,
+      "mass_residual": 0.0,
+      "vz_residual": 0.0,
+      "vxy_residual": 0.0,
+      "smooth_z": 0.0,
+      "smooth_vz": 0.0
+    },
+    "lr": 0.0007388408007496744
+  },
+  {
+    "epoch": 42,
+    "train": {
+      "total": 0.37694578568140663,
+      "data": 0.09866304298241933,
+      "physics": 2.630195426940918,
+      "boundary": 0.015263191300133865,
+      "mass_residual": 0.0,
+      "vz_residual": 0.0,
+      "vxy_residual": 0.0,
+      "smooth_z": 0.0,
+      "smooth_vz": 0.0
+    },
+    "val": {
+      "total": 0.3966125547885895,
+      "data": 0.10833718876043956,
+      "physics": 2.680776039759318,
+      "boundary": 0.020197745102147262,
+      "mass_residual": 0.0,
+      "vz_residual": 0.0,
+      "vxy_residual": 0.0,
+      "smooth_z": 0.0,
+      "smooth_vz": 0.0
+    },
+    "lr": 0.0007272682546199035
+  },
+  {
+    "epoch": 43,
+    "train": {
+      "total": 0.37434835036595665,
+      "data": 0.10177227010329565,
+      "physics": 2.5648952166239423,
+      "boundary": 0.016086561356981596,
+      "mass_residual": 0.0,
+      "vz_residual": 0.0,
+      "vxy_residual": 0.0,
+      "smooth_z": 0.0,
+      "smooth_vz": 0.0
+    },
+    "val": {
+      "total": 0.3979395826657613,
+      "data": 0.1296201397975286,
+      "physics": 2.539091865221659,
+      "boundary": 0.014410261685649553,
+      "mass_residual": 0.0,
+      "vz_residual": 0.0,
+      "vxy_residual": 0.0,
+      "smooth_z": 0.0,
+      "smooth_vz": 0.0
+    },
+    "lr": 0.0007155402928557433
+  },
+  {
+    "epoch": 44,
+    "train": {
+      "total": 0.3697950005531311,
+      "data": 0.10126518309116364,
+      "physics": 2.527372185389201,
+      "boundary": 0.015792597271502017,
+      "mass_residual": 0.0,
+      "vz_residual": 0.0,
+      "vxy_residual": 0.0,
+      "smooth_z": 0.0,
+      "smooth_vz": 0.0
+    },
+    "val": {
+      "total": 0.3932534456253052,
+      "data": 0.10716106742620468,
+      "physics": 2.6960160732269287,
+      "boundary": 0.016490765226384003,
+      "mass_residual": 0.0,
+      "vz_residual": 0.0,
+      "vxy_residual": 0.0,
+      "smooth_z": 0.0,
+      "smooth_vz": 0.0
+    },
+    "lr": 0.0007036649532163621
+  },
+  {
+    "epoch": 45,
+    "train": {
+      "total": 0.3700687865416209,
+      "data": 0.10105467736721038,
+      "physics": 2.527637004852295,
+      "boundary": 0.016250403970479964,
+      "mass_residual": 0.0,
+      "vz_residual": 0.0,
+      "vxy_residual": 0.0,
+      "smooth_z": 0.0,
+      "smooth_vz": 0.0
+    },
+    "val": {
+      "total": 0.4037441611289978,
+      "data": 0.08743074784676234,
+      "physics": 2.990793466567993,
+      "boundary": 0.017234071468313534,
+      "mass_residual": 0.0,
+      "vz_residual": 0.0,
+      "vxy_residual": 0.0,
+      "smooth_z": 0.0,
+      "smooth_vz": 0.0
+    },
+    "lr": 0.0006916503744663621
+  },
+  {
+    "epoch": 46,
+    "train": {
+      "total": 0.37040238579114276,
+      "data": 0.09652151962121328,
+      "physics": 2.5779112180074057,
+      "boundary": 0.016089743313690025,
+      "mass_residual": 0.0,
+      "vz_residual": 0.0,
+      "vxy_residual": 0.0,
+      "smooth_z": 0.0,
+      "smooth_vz": 0.0
+    },
+    "val": {
+      "total": 0.3972931702931722,
+      "data": 0.11537663141886394,
+      "physics": 2.6340178648630777,
+      "boundary": 0.01851474028080702,
+      "mass_residual": 0.0,
+      "vz_residual": 0.0,
+      "vxy_residual": 0.0,
+      "smooth_z": 0.0,
+      "smooth_vz": 0.0
+    },
+    "lr": 0.0006795047907978774
+  },
+  {
+    "epoch": 47,
+    "train": {
+      "total": 0.3717934608459473,
+      "data": 0.10178298205137253,
+      "physics": 2.5436726808547974,
+      "boundary": 0.01564320338269075,
+      "mass_residual": 0.0,
+      "vz_residual": 0.0,
+      "vxy_residual": 0.0,
+      "smooth_z": 0.0,
+      "smooth_vz": 0.0
+    },
+    "val": {
+      "total": 0.39335639278093976,
+      "data": 0.1023178721467654,
+      "physics": 2.717951536178589,
+      "boundary": 0.019243358944853146,
+      "mass_residual": 0.0,
+      "vz_residual": 0.0,
+      "vxy_residual": 0.0,
+      "smooth_z": 0.0,
+      "smooth_vz": 0.0
+    },
+    "lr": 0.0006672365261872684
+  },
+  {
+    "epoch": 48,
+    "train": {
+      "total": 0.3670926749706268,
+      "data": 0.09893255978822708,
+      "physics": 2.51097891330719,
+      "boundary": 0.01706222208837668,
+      "mass_residual": 0.0,
+      "vz_residual": 0.0,
+      "vxy_residual": 0.0,
+      "smooth_z": 0.0,
+      "smooth_vz": 0.0
+    },
+    "val": {
+      "total": 0.39364172021547955,
+      "data": 0.09721586604913075,
+      "physics": 2.8342745304107666,
+      "boundary": 0.0129983921845754,
+      "mass_residual": 0.0,
+      "vz_residual": 0.0,
+      "vxy_residual": 0.0,
+      "smooth_z": 0.0,
+      "smooth_vz": 0.0
+    },
+    "lr": 0.0006548539886902862
+  },
+  {
+    "epoch": 49,
+    "train": {
+      "total": 0.3660609265168508,
+      "data": 0.09523149381081263,
+      "physics": 2.5506603876749674,
+      "boundary": 0.015763384600480396,
+      "mass_residual": 0.0,
+      "vz_residual": 0.0,
+      "vxy_residual": 0.0,
+      "smooth_z": 0.0,
+      "smooth_vz": 0.0
+    },
+    "val": {
+      "total": 0.39172040422757465,
+      "data": 0.10249678542216618,
+      "physics": 2.7697250048319497,
+      "boundary": 0.012251116645832857,
+      "mass_residual": 0.0,
+      "vz_residual": 0.0,
+      "vxy_residual": 0.0,
+      "smooth_z": 0.0,
+      "smooth_vz": 0.0
+    },
+    "lr": 0.0006423656646796094
+  },
+  {
+    "epoch": 50,
+    "train": {
+      "total": 0.36534595489501953,
+      "data": 0.09598738650480906,
+      "physics": 2.5339505672454834,
+      "boundary": 0.015963512534896532,
+      "mass_residual": 0.0,
+      "vz_residual": 0.0,
+      "vxy_residual": 0.0,
+      "smooth_z": 0.0,
+      "smooth_vz": 0.0
+    },
+    "val": {
+      "total": 0.390917311112086,
+      "data": 0.09318023423353831,
+      "physics": 2.824671506881714,
+      "boundary": 0.015269915573298931,
+      "mass_residual": 0.0,
+      "vz_residual": 0.0,
+      "vxy_residual": 0.0,
+      "smooth_z": 0.0,
+      "smooth_vz": 0.0
+    },
+    "lr": 0.000629780113028709
+  },
+  {
+    "epoch": 51,
+    "train": {
+      "total": 0.3646036128203074,
+      "data": 0.09698109130064646,
+      "physics": 2.5167568842569987,
+      "boundary": 0.01594683136790991,
+      "mass_residual": 0.0,
+      "vz_residual": 0.0,
+      "vxy_residual": 0.0,
+      "smooth_z": 0.0,
+      "smooth_vz": 0.0
+    },
+    "val": {
+      "total": 0.39437323808670044,
+      "data": 0.10026536881923676,
+      "physics": 2.7416234016418457,
+      "boundary": 0.019945515940586727,
+      "mass_residual": 0.0,
+      "vz_residual": 0.0,
+      "vxy_residual": 0.0,
+      "smooth_z": 0.0,
+      "smooth_vz": 0.0
+    },
+    "lr": 0.0006171059592460247
+  },
+  {
+    "epoch": 52,
+    "train": {
+      "total": 0.36366479595502216,
+      "data": 0.0935641293724378,
+      "physics": 2.5413738091786704,
+      "boundary": 0.015963281194369,
+      "mass_residual": 0.0,
+      "vz_residual": 0.0,
+      "vxy_residual": 0.0,
+      "smooth_z": 0.0,
+      "smooth_vz": 0.0
+    },
+    "val": {
+      "total": 0.39010531703631085,
+      "data": 0.11278711011012395,
+      "physics": 2.5569910208384194,
+      "boundary": 0.021619112230837345,
+      "mass_residual": 0.0,
+      "vz_residual": 0.0,
+      "vxy_residual": 0.0,
+      "smooth_z": 0.0,
+      "smooth_vz": 0.0
+    },
+    "lr": 0.0006043518895634706
+  },
+  {
+    "epoch": 53,
+    "train": {
+      "total": 0.36437145471572874,
+      "data": 0.09485748807589213,
+      "physics": 2.5352810700734456,
+      "boundary": 0.01598586334536473,
+      "mass_residual": 0.0,
+      "vz_residual": 0.0,
+      "vxy_residual": 0.0,
+      "smooth_z": 0.0,
+      "smooth_vz": 0.0
+    },
+    "val": {
+      "total": 0.39036280910174054,
+      "data": 0.10838908702135086,
+      "physics": 2.6606569290161133,
+      "boundary": 0.015908028619984787,
+      "mass_residual": 0.0,
+      "vz_residual": 0.0,
+      "vxy_residual": 0.0,
+      "smooth_z": 0.0,
+      "smooth_vz": 0.0
+    },
+    "lr": 0.0005915266449833275
+  },
+  {
+    "epoch": 54,
+    "train": {
+      "total": 0.3649143040180206,
+      "data": 0.09920898278554281,
+      "physics": 2.4982208490371702,
+      "boundary": 0.01588322352617979,
+      "mass_residual": 0.0,
+      "vz_residual": 0.0,
+      "vxy_residual": 0.0,
+      "smooth_z": 0.0,
+      "smooth_vz": 0.0
+    },
+    "val": {
+      "total": 0.3908357421557109,
+      "data": 0.08577214429775874,
+      "physics": 2.87130339940389,
+      "boundary": 0.01793324574828148,
+      "mass_residual": 0.0,
+      "vz_residual": 0.0,
+      "vxy_residual": 0.0,
+      "smooth_z": 0.0,
+      "smooth_vz": 0.0
+    },
+    "lr": 0.0005786390152875951
+  },
+  {
+    "epoch": 55,
+    "train": {
+      "total": 0.3643738508224487,
+      "data": 0.09236373156309127,
+      "physics": 2.562848528226217,
+      "boundary": 0.01572525817900896,
+      "mass_residual": 0.0,
+      "vz_residual": 0.0,
+      "vxy_residual": 0.0,
+      "smooth_z": 0.0,
+      "smooth_vz": 0.0
+    },
+    "val": {
+      "total": 0.39200906952222186,
+      "data": 0.09822287907203038,
+      "physics": 2.7729286352793374,
+      "boundary": 0.016493322948614757,
+      "mass_residual": 0.0,
+      "vz_residual": 0.0,
+      "vxy_residual": 0.0,
+      "smooth_z": 0.0,
+      "smooth_vz": 0.0
+    },
+    "lr": 0.0005656978330139155
+  },
+  {
+    "epoch": 56,
+    "train": {
+      "total": 0.3640503545602163,
+      "data": 0.09666214088598887,
+      "physics": 2.512726004918416,
+      "boundary": 0.01611561154325803,
+      "mass_residual": 0.0,
+      "vz_residual": 0.0,
+      "vxy_residual": 0.0,
+      "smooth_z": 0.0,
+      "smooth_vz": 0.0
+    },
+    "val": {
+      "total": 0.39016371965408325,
+      "data": 0.10251493006944656,
+      "physics": 2.7226553757985434,
+      "boundary": 0.015383237351973852,
+      "mass_residual": 0.0,
+      "vz_residual": 0.0,
+      "vxy_residual": 0.0,
+      "smooth_z": 0.0,
+      "smooth_vz": 0.0
+    },
+    "lr": 0.0005527119674021928
+  },
+  {
+    "epoch": 57,
+    "train": {
+      "total": 0.36318317453066506,
+      "data": 0.09463458210229873,
+      "physics": 2.5291059494018553,
+      "boundary": 0.015637993377943835,
+      "mass_residual": 0.0,
+      "vz_residual": 0.0,
+      "vxy_residual": 0.0,
+      "smooth_z": 0.0,
+      "smooth_vz": 0.0
+    },
+    "val": {
+      "total": 0.39450199405352276,
+      "data": 0.11383566508690517,
+      "physics": 2.6284886995951333,
+      "boundary": 0.01781746031095584,
+      "mass_residual": 0.0,
+      "vz_residual": 0.0,
+      "vxy_residual": 0.0,
+      "smooth_z": 0.0,
+      "smooth_vz": 0.0
+    },
+    "lr": 0.0005396903183160584
+  },
+  {
+    "epoch": 58,
+    "train": {
+      "total": 0.3658893605073293,
+      "data": 0.09828254729509353,
+      "physics": 2.5178589185078937,
+      "boundary": 0.01582091972231865,
+      "mass_residual": 0.0,
+      "vz_residual": 0.0,
+      "vxy_residual": 0.0,
+      "smooth_z": 0.0,
+      "smooth_vz": 0.0
+    },
+    "val": {
+      "total": 0.4017567237218221,
+      "data": 0.10039910425742467,
+      "physics": 2.841116189956665,
+      "boundary": 0.017246004504462082,
+      "mass_residual": 0.0,
+      "vz_residual": 0.0,
+      "vxy_residual": 0.0,
+      "smooth_z": 0.0,
+      "smooth_vz": 0.0
+    },
+    "lr": 0.0005266418101433502
+  },
+  {
+    "epoch": 59,
+    "train": {
+      "total": 0.36538782517115276,
+      "data": 0.09545906533797582,
+      "physics": 2.541790548960368,
+      "boundary": 0.01574969831854105,
+      "mass_residual": 0.0,
+      "vz_residual": 0.0,
+      "vxy_residual": 0.0,
+      "smooth_z": 0.0,
+      "smooth_vz": 0.0
+    },
+    "val": {
+      "total": 0.3896111448605855,
+      "data": 0.10195078452428182,
+      "physics": 2.7005577087402344,
+      "boundary": 0.01760459877550602,
+      "mass_residual": 0.0,
+      "vz_residual": 0.0,
+      "vxy_residual": 0.0,
+      "smooth_z": 0.0,
+      "smooth_vz": 0.0
+    },
+    "lr": 0.0005135753856797824
+  },
+  {
+    "epoch": 60,
+    "train": {
+      "total": 0.36220038930575055,
+      "data": 0.09418484022219976,
+      "physics": 2.5218859195709227,
+      "boundary": 0.01582695214698712,
+      "mass_residual": 0.0,
+      "vz_residual": 0.0,
+      "vxy_residual": 0.0,
+      "smooth_z": 0.0,
+      "smooth_vz": 0.0
+    },
+    "val": {
+      "total": 0.38843411207199097,
+      "data": 0.10758044570684433,
+      "physics": 2.6441089312235513,
+      "boundary": 0.01644278069337209,
+      "mass_residual": 0.0,
+      "vz_residual": 0.0,
+      "vxy_residual": 0.0,
+      "smooth_z": 0.0,
+      "smooth_vz": 0.0
+    },
+    "lr": 0.0005005
+  },
+  {
+    "epoch": 61,
+    "train": {
+      "total": 0.3607338726520538,
+      "data": 0.09320820371309917,
+      "physics": 2.5184876044591267,
+      "boundary": 0.01567690142740806,
+      "mass_residual": 0.0,
+      "vz_residual": 0.0,
+      "vxy_residual": 0.0,
+      "smooth_z": 0.0,
+      "smooth_vz": 0.0
+    },
+    "val": {
+      "total": 0.38786210616429645,
+      "data": 0.09128815929094951,
+      "physics": 2.795114040374756,
+      "boundary": 0.017062544201811154,
+      "mass_residual": 0.0,
+      "vz_residual": 0.0,
+      "vxy_residual": 0.0,
+      "smooth_z": 0.0,
+      "smooth_vz": 0.0
+    },
+    "lr": 0.0004874246143202173
+  },
+  {
+    "epoch": 62,
+    "train": {
+      "total": 0.36044107874234516,
+      "data": 0.09249303142229716,
+      "physics": 2.5210204760233563,
+      "boundary": 0.015845997569461662,
+      "mass_residual": 0.0,
+      "vz_residual": 0.0,
+      "vxy_residual": 0.0,
+      "smooth_z": 0.0,
+      "smooth_vz": 0.0
+    },
+    "val": {
+      "total": 0.38805614908536273,
+      "data": 0.09549024452765782,
+      "physics": 2.7433084646860757,
+      "boundary": 0.01823505728195111,
+      "mass_residual": 0.0,
+      "vz_residual": 0.0,
+      "vxy_residual": 0.0,
+      "smooth_z": 0.0,
+      "smooth_vz": 0.0
+    },
+    "lr": 0.0004743581898566495
+  },
+  {
+    "epoch": 63,
+    "train": {
+      "total": 0.36036511063575744,
+      "data": 0.09237171163161596,
+      "physics": 2.5221946080525717,
+      "boundary": 0.01577393716822068,
+      "mass_residual": 0.0,
+      "vz_residual": 0.0,
+      "vxy_residual": 0.0,
+      "smooth_z": 0.0,
+      "smooth_vz": 0.0
+    },
+    "val": {
+      "total": 0.38745726148287457,
+      "data": 0.10521804292996724,
+      "physics": 2.6476146380106607,
+      "boundary": 0.017477739602327347,
+      "mass_residual": 0.0,
+      "vz_residual": 0.0,
+      "vxy_residual": 0.0,
+      "smooth_z": 0.0,
+      "smooth_vz": 0.0
+    },
+    "lr": 0.0004613096816839414
+  },
+  {
+    "epoch": 64,
+    "train": {
+      "total": 0.36086851358413696,
+      "data": 0.09334719926118851,
+      "physics": 2.516338570912679,
+      "boundary": 0.015887455890576045,
+      "mass_residual": 0.0,
+      "vz_residual": 0.0,
+      "vxy_residual": 0.0,
+      "smooth_z": 0.0,
+      "smooth_vz": 0.0
+    },
+    "val": {
+      "total": 0.3872734606266022,
+      "data": 0.09418882181247075,
+      "physics": 2.7400577068328857,
+      "boundary": 0.019078859438498814,
+      "mass_residual": 0.0,
+      "vz_residual": 0.0,
+      "vxy_residual": 0.0,
+      "smooth_z": 0.0,
+      "smooth_vz": 0.0
+    },
+    "lr": 0.0004482880325978071
+  },
+  {
+    "epoch": 65,
+    "train": {
+      "total": 0.36044679482777914,
+      "data": 0.09133090178171793,
+      "physics": 2.5333687623341876,
+      "boundary": 0.015779011199871698,
+      "mass_residual": 0.0,
+      "vz_residual": 0.0,
+      "vxy_residual": 0.0,
+      "smooth_z": 0.0,
+      "smooth_vz": 0.0
+    },
+    "val": {
+      "total": 0.3875597318013509,
+      "data": 0.10036316762367885,
+      "physics": 2.6977615356445312,
+      "boundary": 0.017420395277440548,
+      "mass_residual": 0.0,
+      "vz_residual": 0.0,
+      "vxy_residual": 0.0,
+      "smooth_z": 0.0,
+      "smooth_vz": 0.0
+    },
+    "lr": 0.00043530216698608424
+  },
+  {
+    "epoch": 66,
+    "train": {
+      "total": 0.36022327144940697,
+      "data": 0.09265985091527303,
+      "physics": 2.517134682337443,
+      "boundary": 0.01584994445244471,
+      "mass_residual": 0.0,
+      "vz_residual": 0.0,
+      "vxy_residual": 0.0,
+      "smooth_z": 0.0,
+      "smooth_vz": 0.0
+    },
+    "val": {
+      "total": 0.38879822691281635,
+      "data": 0.09669877340396245,
+      "physics": 2.734083334604899,
+      "boundary": 0.018691095833977062,
+      "mass_residual": 0.0,
+      "vz_residual": 0.0,
+      "vxy_residual": 0.0,
+      "smooth_z": 0.0,
+      "smooth_vz": 0.0
+    },
+    "lr": 0.00042236098471240454
+  },
+  {
+    "epoch": 67,
+    "train": {
+      "total": 0.36102325717608136,
+      "data": 0.09371871103843053,
+      "physics": 2.5150131543477374,
+      "boundary": 0.015803222234050434,
+      "mass_residual": 0.0,
+      "vz_residual": 0.0,
+      "vxy_residual": 0.0,
+      "smooth_z": 0.0,
+      "smooth_vz": 0.0
+    },
+    "val": {
+      "total": 0.38865835467974347,
+      "data": 0.10858876754840215,
+      "physics": 2.628084739049276,
+      "boundary": 0.017261096586783726,
+      "mass_residual": 0.0,
+      "vz_residual": 0.0,
+      "vxy_residual": 0.0,
+      "smooth_z": 0.0,
+      "smooth_vz": 0.0
+    },
+    "lr": 0.0004094733550166723
+  },
+  {
+    "epoch": 68,
+    "train": {
+      "total": 0.36056461532910666,
+      "data": 0.09326779146989186,
+      "physics": 2.5161441485087077,
+      "boundary": 0.01568240157018105,
+      "mass_residual": 0.0,
+      "vz_residual": 0.0,
+      "vxy_residual": 0.0,
+      "smooth_z": 0.0,
+      "smooth_vz": 0.0
+    },
+    "val": {
+      "total": 0.3883818785349528,
+      "data": 0.09920230756203334,
+      "physics": 2.7275346914927163,
+      "boundary": 0.016426087046662968,
+      "mass_residual": 0.0,
+      "vz_residual": 0.0,
+      "vxy_residual": 0.0,
+      "smooth_z": 0.0,
+      "smooth_vz": 0.0
+    },
+    "lr": 0.00039664811043652905
+  },
+  {
+    "epoch": 69,
+    "train": {
+      "total": 0.36030987501144407,
+      "data": 0.09262914607922236,
+      "physics": 2.5190403779347736,
+      "boundary": 0.015776682024200756,
+      "mass_residual": 0.0,
+      "vz_residual": 0.0,
+      "vxy_residual": 0.0,
+      "smooth_z": 0.0,
+      "smooth_vz": 0.0
+    },
+    "val": {
+      "total": 0.38671937584877014,
+      "data": 0.09228250632683437,
+      "physics": 2.761146306991577,
+      "boundary": 0.018322232800225418,
+      "mass_residual": 0.0,
+      "vz_residual": 0.0,
+      "vxy_residual": 0.0,
+      "smooth_z": 0.0,
+      "smooth_vz": 0.0
+    },
+    "lr": 0.00038389404075397514
+  },
+  {
+    "epoch": 70,
+    "train": {
+      "total": 0.3597859521706899,
+      "data": 0.09184468984603882,
+      "physics": 2.520538640022278,
+      "boundary": 0.015887400445838768,
+      "mass_residual": 0.0,
+      "vz_residual": 0.0,
+      "vxy_residual": 0.0,
+      "smooth_z": 0.0,
+      "smooth_vz": 0.0
+    },
+    "val": {
+      "total": 0.3871462345123291,
+      "data": 0.09801748394966125,
+      "physics": 2.7130471070607505,
+      "boundary": 0.017824025824666023,
+      "mass_residual": 0.0,
+      "vz_residual": 0.0,
+      "vxy_residual": 0.0,
+      "smooth_z": 0.0,
+      "smooth_vz": 0.0
+    },
+    "lr": 0.0003712198869712908
+  },
+  {
+    "epoch": 71,
+    "train": {
+      "total": 0.359563014904658,
+      "data": 0.0916678046186765,
+      "physics": 2.521823008855184,
+      "boundary": 0.015712894809742767,
+      "mass_residual": 0.0,
+      "vz_residual": 0.0,
+      "vxy_residual": 0.0,
+      "smooth_z": 0.0,
+      "smooth_vz": 0.0
+    },
+    "val": {
+      "total": 0.38671329617500305,
+      "data": 0.09558416157960892,
+      "physics": 2.7420814832051597,
+      "boundary": 0.0169209868957599,
+      "mass_residual": 0.0,
+      "vz_residual": 0.0,
+      "vxy_residual": 0.0,
+      "smooth_z": 0.0,
+      "smooth_vz": 0.0
+    },
+    "lr": 0.00035863433532039047
+  },
+  {
+    "epoch": 72,
+    "train": {
+      "total": 0.35972148180007935,
+      "data": 0.09193594108025233,
+      "physics": 2.5195561250050864,
+      "boundary": 0.015829915615419545,
+      "mass_residual": 0.0,
+      "vz_residual": 0.0,
+      "vxy_residual": 0.0,
+      "smooth_z": 0.0,
+      "smooth_vz": 0.0
+    },
+    "val": {
+      "total": 0.3864033321539561,
+      "data": 0.09693554043769836,
+      "physics": 2.7253527641296387,
+      "boundary": 0.016932509529093902,
+      "mass_residual": 0.0,
+      "vz_residual": 0.0,
+      "vxy_residual": 0.0,
+      "smooth_z": 0.0,
+      "smooth_vz": 0.0
+    },
+    "lr": 0.00034614601130971367
+  },
+  {
+    "epoch": 73,
+    "train": {
+      "total": 0.36006492376327515,
+      "data": 0.09196960826714834,
+      "physics": 2.524265162150065,
+      "boundary": 0.015668799728155137,
+      "mass_residual": 0.0,
+      "vz_residual": 0.0,
+      "vxy_residual": 0.0,
+      "smooth_z": 0.0,
+      "smooth_vz": 0.0
+    },
+    "val": {
+      "total": 0.38646426796913147,
+      "data": 0.0959513783454895,
+      "physics": 2.729633013407389,
+      "boundary": 0.017549582446614902,
+      "mass_residual": 0.0,
+      "vz_residual": 0.0,
+      "vxy_residual": 0.0,
+      "smooth_z": 0.0,
+      "smooth_vz": 0.0
+    },
+    "lr": 0.00033376347381273134
+  },
+  {
+    "epoch": 74,
+    "train": {
+      "total": 0.3596485197544098,
+      "data": 0.09276510278383891,
+      "physics": 2.510823059082031,
+      "boundary": 0.015801106952130793,
+      "mass_residual": 0.0,
+      "vz_residual": 0.0,
+      "vxy_residual": 0.0,
+      "smooth_z": 0.0,
+      "smooth_vz": 0.0
+    },
+    "val": {
+      "total": 0.3866301079591115,
+      "data": 0.09433800727128983,
+      "physics": 2.7499711513519287,
+      "boundary": 0.017294973755876224,
+      "mass_residual": 0.0,
+      "vz_residual": 0.0,
+      "vxy_residual": 0.0,
+      "smooth_z": 0.0,
+      "smooth_vz": 0.0
+    },
+    "lr": 0.0003214952092021224
+  },
+  {
+    "epoch": 75,
+    "train": {
+      "total": 0.3593228052059809,
+      "data": 0.09129750654101372,
+      "physics": 2.5226763486862183,
+      "boundary": 0.0157576572149992,
+      "mass_residual": 0.0,
+      "vz_residual": 0.0,
+      "vxy_residual": 0.0,
+      "smooth_z": 0.0,
+      "smooth_vz": 0.0
+    },
+    "val": {
+      "total": 0.3863588074843089,
+      "data": 0.0967555120587349,
+      "physics": 2.7122132778167725,
+      "boundary": 0.01838196689883868,
+      "mass_residual": 0.0,
+      "vz_residual": 0.0,
+      "vxy_residual": 0.0,
+      "smooth_z": 0.0,
+      "smooth_vz": 0.0
+    },
+    "lr": 0.0003093496255336376
+  },
+  {
+    "epoch": 76,
+    "train": {
+      "total": 0.359271631638209,
+      "data": 0.09159789284070333,
+      "physics": 2.518969519933065,
+      "boundary": 0.015776784718036653,
+      "mass_residual": 0.0,
+      "vz_residual": 0.0,
+      "vxy_residual": 0.0,
+      "smooth_z": 0.0,
+      "smooth_vz": 0.0
+    },
+    "val": {
+      "total": 0.38701413075129193,
+      "data": 0.10059430946906407,
+      "physics": 2.689784288406372,
+      "boundary": 0.01744138201077779,
+      "mass_residual": 0.0,
+      "vz_residual": 0.0,
+      "vxy_residual": 0.0,
+      "smooth_z": 0.0,
+      "smooth_vz": 0.0
+    },
+    "lr": 0.0002973350467836378
+  },
+  {
+    "epoch": 77,
+    "train": {
+      "total": 0.359082305431366,
+      "data": 0.09149962415297826,
+      "physics": 2.5179869810740154,
+      "boundary": 0.015783971175551414,
+      "mass_residual": 0.0,
+      "vz_residual": 0.0,
+      "vxy_residual": 0.0,
+      "smooth_z": 0.0,
+      "smooth_vz": 0.0
+    },
+    "val": {
+      "total": 0.3861902058124542,
+      "data": 0.09533888846635818,
+      "physics": 2.73622727394104,
+      "boundary": 0.017228591566284496,
+      "mass_residual": 0.0,
+      "vz_residual": 0.0,
+      "vxy_residual": 0.0,
+      "smooth_z": 0.0,
+      "smooth_vz": 0.0
+    },
+    "lr": 0.0002854597071442566
+  },
+  {
+    "epoch": 78,
+    "train": {
+      "total": 0.35890380044778186,
+      "data": 0.09110947102308273,
+      "physics": 2.5198090712229413,
+      "boundary": 0.01581341146181027,
+      "mass_residual": 0.0,
+      "vz_residual": 0.0,
+      "vxy_residual": 0.0,
+      "smooth_z": 0.0,
+      "smooth_vz": 0.0
+    },
+    "val": {
+      "total": 0.38700780272483826,
+      "data": 0.10057736436525981,
+      "physics": 2.693015734354655,
+      "boundary": 0.017128860267500084,
+      "mass_residual": 0.0,
+      "vz_residual": 0.0,
+      "vxy_residual": 0.0,
+      "smooth_z": 0.0,
+      "smooth_vz": 0.0
+    },
+    "lr": 0.00027373174538009633
+  },
+  {
+    "epoch": 79,
+    "train": {
+      "total": 0.35947441856066387,
+      "data": 0.09252792646487554,
+      "physics": 2.5117924849192304,
+      "boundary": 0.015767235929767292,
+      "mass_residual": 0.0,
+      "vz_residual": 0.0,
+      "vxy_residual": 0.0,
+      "smooth_z": 0.0,
+      "smooth_vz": 0.0
+    },
+    "val": {
+      "total": 0.3865595757961273,
+      "data": 0.09741343061129253,
+      "physics": 2.710428158442179,
+      "boundary": 0.018103324497739475,
+      "mass_residual": 0.0,
+      "vz_residual": 0.0,
+      "vxy_residual": 0.0,
+      "smooth_z": 0.0,
+      "smooth_vz": 0.0
+    },
+    "lr": 0.00026215919925032553
+  },
+  {
+    "epoch": 80,
+    "train": {
+      "total": 0.35925416747728983,
+      "data": 0.09144739657640458,
+      "physics": 2.5193260510762534,
+      "boundary": 0.01587416008114815,
+      "mass_residual": 0.0,
+      "vz_residual": 0.0,
+      "vxy_residual": 0.0,
+      "smooth_z": 0.0,
+      "smooth_vz": 0.0
+    },
+    "val": {
+      "total": 0.3859812319278717,
+      "data": 0.09429048498471577,
+      "physics": 2.750513474146525,
+      "boundary": 0.016639390029013157,
+      "mass_residual": 0.0,
+      "vz_residual": 0.0,
+      "vxy_residual": 0.0,
+      "smooth_z": 0.0,
+      "smooth_vz": 0.0
+    },
+    "lr": 0.00025075000000000005
+  },
+  {
+    "epoch": 81,
+    "train": {
+      "total": 0.3590347548325857,
+      "data": 0.09112238337596258,
+      "physics": 2.52157682577769,
+      "boundary": 0.015754681266844272,
+      "mass_residual": 0.0,
+      "vz_residual": 0.0,
+      "vxy_residual": 0.0,
+      "smooth_z": 0.0,
+      "smooth_vz": 0.0
+    },
+    "val": {
+      "total": 0.3869376977284749,
+      "data": 0.10532744477192561,
+      "physics": 2.6467875639597573,
+      "boundary": 0.01693150804688533,
+      "mass_residual": 0.0,
+      "vz_residual": 0.0,
+      "vxy_residual": 0.0,
+      "smooth_z": 0.0,
+      "smooth_vz": 0.0
+    },
+    "lr": 0.00023951196692438347
+  },
+  {
+    "epoch": 82,
+    "train": {
+      "total": 0.35895875493685403,
+      "data": 0.09163011113802592,
+      "physics": 2.5156654675801593,
+      "boundary": 0.015762091614305973,
+      "mass_residual": 0.0,
+      "vz_residual": 0.0,
+      "vxy_residual": 0.0,
+      "smooth_z": 0.0,
+      "smooth_vz": 0.0
+    },
+    "val": {
+      "total": 0.3861471811930339,
+      "data": 0.09624017775058746,
+      "physics": 2.708395799001058,
+      "boundary": 0.01906742372860511,
+      "mass_residual": 0.0,
+      "vz_residual": 0.0,
+      "vxy_residual": 0.0,
+      "smooth_z": 0.0,
+      "smooth_vz": 0.0
+    },
+    "lr": 0.00022845280200999403
+  },
+  {
+    "epoch": 83,
+    "train": {
+      "total": 0.3589839220046997,
+      "data": 0.09083724915981292,
+      "physics": 2.523241074879964,
+      "boundary": 0.015822559595108032,
+      "mass_residual": 0.0,
+      "vz_residual": 0.0,
+      "vxy_residual": 0.0,
+      "smooth_z": 0.0,
+      "smooth_vz": 0.0
+    },
+    "val": {
+      "total": 0.38764698306719464,
+      "data": 0.10533183813095093,
+      "physics": 2.6461841265360513,
+      "boundary": 0.01769674600412448,
+      "mass_residual": 0.0,
+      "vz_residual": 0.0,
+      "vxy_residual": 0.0,
+      "smooth_z": 0.0,
+      "smooth_vz": 0.0
+    },
+    "lr": 0.0002175800846560458
+  },
+  {
+    "epoch": 84,
+    "train": {
+      "total": 0.3593192458152771,
+      "data": 0.09185732404390971,
+      "physics": 2.5164193232854206,
+      "boundary": 0.015819988896449408,
+      "mass_residual": 0.0,
+      "vz_residual": 0.0,
+      "vxy_residual": 0.0,
+      "smooth_z": 0.0,
+      "smooth_vz": 0.0
+    },
+    "val": {
+      "total": 0.3864107131958008,
+      "data": 0.10278234630823135,
+      "physics": 2.666386683781942,
+      "boundary": 0.016989686526358128,
+      "mass_residual": 0.0,
+      "vz_residual": 0.0,
+      "vxy_residual": 0.0,
+      "smooth_z": 0.0,
+      "smooth_vz": 0.0
+    },
+    "lr": 0.00020690126647990965
+  },
+  {
+    "epoch": 85,
+    "train": {
+      "total": 0.35893933176994325,
+      "data": 0.09157442897558213,
+      "physics": 2.516717767715454,
+      "boundary": 0.015693118174870808,
+      "mass_residual": 0.0,
+      "vz_residual": 0.0,
+      "vxy_residual": 0.0,
+      "smooth_z": 0.0,
+      "smooth_vz": 0.0
+    },
+    "val": {
+      "total": 0.3863581418991089,
+      "data": 0.09977410236994426,
+      "physics": 2.6903181870778403,
+      "boundary": 0.017552210949361324,
+      "mass_residual": 0.0,
+      "vz_residual": 0.0,
+      "vxy_residual": 0.0,
+      "smooth_z": 0.0,
+      "smooth_vz": 0.0
+    },
+    "lr": 0.00019642366621014398
+  },
+  {
+    "epoch": 86,
+    "train": {
+      "total": 0.3587886850039164,
+      "data": 0.09200215488672256,
+      "physics": 2.509513250986735,
+      "boundary": 0.01583520236114661,
+      "mass_residual": 0.0,
+      "vz_residual": 0.0,
+      "vxy_residual": 0.0,
+      "smooth_z": 0.0,
+      "smooth_vz": 0.0
+    },
+    "val": {
+      "total": 0.38610972960789997,
+      "data": 0.09157338986794154,
+      "physics": 2.7690741221110025,
+      "boundary": 0.017628923679391544,
+      "mass_residual": 0.0,
+      "vz_residual": 0.0,
+      "vxy_residual": 0.0,
+      "smooth_z": 0.0,
+      "smooth_vz": 0.0
+    },
+    "lr": 0.00018615446467060623
+  },
+  {
+    "epoch": 87,
+    "train": {
+      "total": 0.3587516605854034,
+      "data": 0.09084379076957702,
+      "physics": 2.5210631847381593,
+      "boundary": 0.015801544301211834,
+      "mass_residual": 0.0,
+      "vz_residual": 0.0,
+      "vxy_residual": 0.0,
+      "smooth_z": 0.0,
+      "smooth_vz": 0.0
+    },
+    "val": {
+      "total": 0.3857629994551341,
+      "data": 0.09697602689266205,
+      "physics": 2.7128721872965493,
+      "boundary": 0.017499748306969803,
+      "mass_residual": 0.0,
+      "vz_residual": 0.0,
+      "vxy_residual": 0.0,
+      "smooth_z": 0.0,
+      "smooth_vz": 0.0
+    },
+    "lr": 0.00017610069985907328
+  },
+  {
+    "epoch": 88,
+    "train": {
+      "total": 0.3586681226889292,
+      "data": 0.09042737533648809,
+      "physics": 2.5248493194580077,
+      "boundary": 0.015755811830361684,
+      "mass_residual": 0.0,
+      "vz_residual": 0.0,
+      "vxy_residual": 0.0,
+      "smooth_z": 0.0,
+      "smooth_vz": 0.0
+    },
+    "val": {
+      "total": 0.3863784273465474,
+      "data": 0.09693818042675655,
+      "physics": 2.7160075505574546,
+      "boundary": 0.017839467152953148,
+      "mass_residual": 0.0,
+      "vz_residual": 0.0,
+      "vxy_residual": 0.0,
+      "smooth_z": 0.0,
+      "smooth_vz": 0.0
+    },
+    "lr": 0.00016626926212375044
+  },
+  {
+    "epoch": 89,
+    "train": {
+      "total": 0.3587621013323466,
+      "data": 0.09191268036762873,
+      "physics": 2.5102741797765096,
+      "boundary": 0.015822001298268638,
+      "mass_residual": 0.0,
+      "vz_residual": 0.0,
+      "vxy_residual": 0.0,
+      "smooth_z": 0.0,
+      "smooth_vz": 0.0
+    },
+    "val": {
+      "total": 0.38585875431696576,
+      "data": 0.09719849129517873,
+      "physics": 2.7127588589986167,
+      "boundary": 0.01738437234113614,
+      "mass_residual": 0.0,
+      "vz_residual": 0.0,
+      "vxy_residual": 0.0,
+      "smooth_z": 0.0,
+      "smooth_vz": 0.0
+    },
+    "lr": 0.00015666688944096976
+  },
+  {
+    "epoch": 90,
+    "train": {
+      "total": 0.3586965342362722,
+      "data": 0.0907791073123614,
+      "physics": 2.5207600752512613,
+      "boundary": 0.01584141341348489,
+      "mass_residual": 0.0,
+      "vz_residual": 0.0,
+      "vxy_residual": 0.0,
+      "smooth_z": 0.0,
+      "smooth_vz": 0.0
+    },
+    "val": {
+      "total": 0.38581570982933044,
+      "data": 0.09741503496964772,
+      "physics": 2.6995791594187417,
+      "boundary": 0.018442753702402115,
+      "mass_residual": 0.0,
+      "vz_residual": 0.0,
+      "vxy_residual": 0.0,
+      "smooth_z": 0.0,
+      "smooth_vz": 0.0
+    },
+    "lr": 0.0001473001627973195
+  },
+  {
+    "epoch": 91,
+    "train": {
+      "total": 0.3586994628111521,
+      "data": 0.09152217209339142,
+      "physics": 2.514499791463216,
+      "boundary": 0.015727311869462333,
+      "mass_residual": 0.0,
+      "vz_residual": 0.0,
+      "vxy_residual": 0.0,
+      "smooth_z": 0.0,
+      "smooth_vz": 0.0
+    },
+    "val": {
+      "total": 0.3856865664323171,
+      "data": 0.09595564504464467,
+      "physics": 2.721303383509318,
+      "boundary": 0.01760057856639226,
+      "mass_residual": 0.0,
+      "vz_residual": 0.0,
+      "vxy_residual": 0.0,
+      "smooth_z": 0.0,
+      "smooth_vz": 0.0
+    },
+    "lr": 0.0001381755016793623
+  },
+  {
+    "epoch": 92,
+    "train": {
+      "total": 0.36227317452430724,
+      "data": 0.09172657132148743,
+      "physics": 2.5073077201843263,
+      "boundary": 0.016220517829060553,
+      "mass_residual": 0.29647757510344186,
+      "vz_residual": 25.712330118815103,
+      "vxy_residual": 1.2171724875768026,
+      "smooth_z": 9.111211206798883e-12,
+      "smooth_vz": 5.568335630553219e-11
+    },
+    "val": {
+      "total": 0.3892160455385844,
+      "data": 0.09773290157318115,
+      "physics": 2.6987899939219155,
+      "boundary": 0.018222264014184475,
+      "mass_residual": 0.3373536517222722,
+      "vz_residual": 24.114590326944988,
+      "vxy_residual": 1.209771712621053,
+      "smooth_z": 9.749975711052331e-12,
+      "smooth_vz": 6.078636436794109e-11
+    },
+    "lr": 0.00012929915967404166
+  },
+  {
+    "epoch": 93,
+    "train": {
+      "total": 0.3727339704831441,
+      "data": 0.09456255634625753,
+      "physics": 2.4674282948176067,
+      "boundary": 0.01757081796725591,
+      "mass_residual": 0.2933551609516144,
+      "vz_residual": 24.83470255533854,
+      "vxy_residual": 1.1902786334355673,
+      "smooth_z": 9.043085551219133e-12,
+      "smooth_vz": 5.360364513373739e-11
+    },
+    "val": {
+      "total": 0.3992638687292735,
+      "data": 0.10068048536777496,
+      "physics": 2.6591619650522866,
+      "boundary": 0.01997921398530404,
+      "mass_residual": 0.3357518861691157,
+      "vz_residual": 22.65258852640788,
+      "vxy_residual": 1.18253759543101,
+      "smooth_z": 9.677265065677343e-12,
+      "smooth_vz": 5.764210752231177e-11
+    },
+    "lr": 0.00012067722018278452
+  },
+  {
+    "epoch": 94,
+    "train": {
+      "total": 0.38923608263333637,
+      "data": 0.10018934309482574,
+      "physics": 2.405069080988566,
+      "boundary": 0.01987414968510469,
+      "mass_residual": 0.3016952763001124,
+      "vz_residual": 22.89840799967448,
+      "vxy_residual": 1.1373526175816855,
+      "smooth_z": 9.156070519822368e-12,
+      "smooth_vz": 4.855226059160186e-11
+    },
+    "val": {
+      "total": 0.41502365469932556,
+      "data": 0.10843338072299957,
+      "physics": 2.5837144454320273,
+      "boundary": 0.02117062235871951,
+      "mass_residual": 0.3474864363670349,
+      "vz_residual": 21.538990020751953,
+      "vxy_residual": 1.0959314902623494,
+      "smooth_z": 9.721717643869828e-12,
+      "smooth_vz": 5.48361333193211e-11
+    },
+    "lr": 0.000112315592252243
+  },
+  {
+    "epoch": 95,
+    "train": {
+      "total": 0.4105458954970042,
+      "data": 0.10802609821160634,
+      "physics": 2.3352280139923094,
+      "boundary": 0.022893630092342694,
+      "mass_residual": 0.3015732685724894,
+      "vz_residual": 20.81602300008138,
+      "vxy_residual": 1.0654170513153076,
+      "smooth_z": 9.111672411947028e-12,
+      "smooth_vz": 4.5689504957202584e-11
+    },
+    "val": {
+      "total": 0.43445466955502826,
+      "data": 0.11300071328878403,
+      "physics": 2.54290779431661,
+      "boundary": 0.025275121132532757,
+      "mass_residual": 0.3466648558775584,
+      "vz_residual": 18.819189071655273,
+      "vxy_residual": 1.072627067565918,
+      "smooth_z": 1.0358931305335753e-11,
+      "smooth_vz": 5.341082553086037e-11
+    },
+    "lr": 0.00010422000652452795
+  },
+  {
+    "epoch": 96,
+    "train": {
+      "total": 0.4337434967358907,
+      "data": 0.1166646550099055,
+      "physics": 2.268839963277181,
+      "boundary": 0.026967516541481017,
+      "mass_residual": 0.31411581138769784,
+      "vz_residual": 18.365676180521646,
+      "vxy_residual": 0.9880765914916992,
+      "smooth_z": 9.342887632527811e-12,
+      "smooth_vz": 4.0884002664813106e-11
+    },
+    "val": {
+      "total": 0.4562285343805949,
+      "data": 0.12056754281123479,
+      "physics": 2.4720771312713623,
+      "boundary": 0.028698898230989773,
+      "mass_residual": 0.3609488308429718,
+      "vz_residual": 17.287094434102375,
+      "vxy_residual": 0.9623034000396729,
+      "smooth_z": 1.0066689380231845e-11,
+      "smooth_vz": 4.8651174524202055e-11
+    },
+    "lr": 9.639601130971378e-05
+  },
+  {
+    "epoch": 97,
+    "train": {
+      "total": 0.4594128727912903,
+      "data": 0.12925578753153483,
+      "physics": 2.189219919840495,
+      "boundary": 0.03111508662501971,
+      "mass_residual": 0.32755006353060406,
+      "vz_residual": 16.271635182698567,
+      "vxy_residual": 0.9068314711252848,
+      "smooth_z": 9.460748908822018e-12,
+      "smooth_vz": 3.710876166536833e-11
+    },
+    "val": {
+      "total": 0.4804839293162028,
+      "data": 0.14435059328873953,
+      "physics": 2.3783066272735596,
+      "boundary": 0.032640536005298294,
+      "mass_residual": 0.36330556869506836,
+      "vz_residual": 13.213090578715006,
+      "vxy_residual": 0.8802881638209025,
+      "smooth_z": 9.416392723430681e-12,
+      "smooth_vz": 3.9410196171300406e-11
+    },
+    "lr": 8.884896878330324e-05
+  },
+  {
+    "epoch": 98,
+    "train": {
+      "total": 0.48397680521011355,
+      "data": 0.1433977484703064,
+      "physics": 2.1348671356836957,
+      "boundary": 0.03555161108573278,
+      "mass_residual": 0.3448436051607132,
+      "vz_residual": 13.746405792236327,
+      "vxy_residual": 0.8218340039253235,
+      "smooth_z": 9.739544124901893e-12,
+      "smooth_vz": 3.550236412723044e-11
+    },
+    "val": {
+      "total": 0.5031359195709229,
+      "data": 0.14182290931542715,
+      "physics": 2.3354466358820596,
+      "boundary": 0.038181159645318985,
+      "mass_residual": 0.39241907993952435,
+      "vz_residual": 13.398251215616861,
+      "vxy_residual": 0.8036274313926697,
+      "smooth_z": 1.0133759861345274e-11,
+      "smooth_vz": 4.106870630608365e-11
+    },
+    "lr": 8.158405131126072e-05
+  },
+  {
+    "epoch": 99,
+    "train": {
+      "total": 0.5081466476122538,
+      "data": 0.1587690164645513,
+      "physics": 2.0824334144592287,
+      "boundary": 0.039993233730395636,
+      "mass_residual": 0.35968425671259563,
+      "vz_residual": 11.71702397664388,
+      "vxy_residual": 0.7530023296674092,
+      "smooth_z": 1.0584502718735678e-11,
+      "smooth_vz": 3.5384316772931376e-11
+    },
+    "val": {
+      "total": 0.5252431333065033,
+      "data": 0.17283285657564798,
+      "physics": 2.2831862370173135,
+      "boundary": 0.04237533484896024,
+      "mass_residual": 0.4030717114607493,
+      "vz_residual": 9.328043619791666,
+      "vxy_residual": 0.7393254439036051,
+      "smooth_z": 1.1610813294612074e-11,
+      "smooth_vz": 4.629354769895381e-11
+    },
+    "lr": 7.460623790513095e-05
+  },
+  {
+    "epoch": 100,
+    "train": {
+      "total": 0.5292606214682262,
+      "data": 0.1726493388414383,
+      "physics": 2.0462655623753867,
+      "boundary": 0.04540297637383143,
+      "mass_residual": 0.3898549437522888,
+      "vz_residual": 9.816411399841309,
+      "vxy_residual": 0.6804295102755229,
+      "smooth_z": 1.0389187658314351e-11,
+      "smooth_vz": 3.319714387643262e-11
+    },
+    "val": {
+      "total": 0.5438305139541626,
+      "data": 0.1889894406000773,
+      "physics": 2.2259682416915894,
+      "boundary": 0.04846535250544548,
+      "mass_residual": 0.43961526950200397,
+      "vz_residual": 7.557925701141357,
+      "vxy_residual": 0.6604736049969991,
+      "smooth_z": 1.0380249033011454e-11,
+      "smooth_vz": 3.8523772135275656e-11
+    },
+    "lr": 6.792031080967285e-05
+  },
+  {
+    "epoch": 101,
+    "train": {
+      "total": 0.5497611999511719,
+      "data": 0.18614819248517353,
+      "physics": 2.0288026412328084,
+      "boundary": 0.04924838542938233,
+      "mass_residual": 0.41682235995928446,
+      "vz_residual": 8.378647518157958,
+      "vxy_residual": 0.616392175356547,
+      "smooth_z": 1.0057621864974682e-11,
+      "smooth_vz": 2.964650619903993e-11
+    },
+    "val": {
+      "total": 0.5610654950141907,
+      "data": 0.19455854098002115,
+      "physics": 2.176423748334249,
+      "boundary": 0.05420283352335294,
+      "mass_residual": 0.44726945956548053,
+      "vz_residual": 7.003241221110026,
+      "vxy_residual": 0.6121450463930765,
+      "smooth_z": 1.0984293914254964e-11,
+      "smooth_vz": 3.5308801021871616e-11
+    },
+    "lr": 6.153085222534833e-05
+  },
+  {
+    "epoch": 102,
+    "train": {
+      "total": 0.5687642574310303,
+      "data": 0.20363267461458842,
+      "physics": 1.992929458618164,
+      "boundary": 0.05376905451218287,
+      "mass_residual": 0.430631548166275,
+      "vz_residual": 7.012576961517334,
+      "vxy_residual": 0.564680564403534,
+      "smooth_z": 1.1017815652880624e-11,
+      "smooth_vz": 3.34093903005724e-11
+    },
+    "val": {
+      "total": 0.5778729120890299,
+      "data": 0.20143153270085654,
+      "physics": 2.2162774006525674,
+      "boundary": 0.05705989400545756,
+      "mass_residual": 0.4689585268497467,
+      "vz_residual": 6.009478727976481,
+      "vxy_residual": 0.5623899698257446,
+      "smooth_z": 1.2665842044160916e-11,
+      "smooth_vz": 4.4600264453853455e-11
+    },
+    "lr": 5.544224116791028e-05
+  },
+  {
+    "epoch": 103,
+    "train": {
+      "total": 0.5842246413230896,
+      "data": 0.21440245509147643,
+      "physics": 1.9791866064071655,
+      "boundary": 0.05707536439100901,
+      "mass_residual": 0.45310189525286354,
+      "vz_residual": 6.089524014790853,
+      "vxy_residual": 0.5230466663837433,
+      "smooth_z": 1.0160074517817641e-11,
+      "smooth_vz": 2.7595272594771458e-11
+    },
+    "val": {
+      "total": 0.5915745298067728,
+      "data": 0.22151352961858115,
+      "physics": 2.170894225438436,
+      "boundary": 0.06063789253433546,
+      "mass_residual": 0.4960430860519409,
+      "vz_residual": 4.745869159698486,
+      "vxy_residual": 0.5157490571339926,
+      "smooth_z": 1.0069221787386192e-11,
+      "smooth_vz": 2.8820010614105662e-11
+    },
+    "lr": 4.9658650467244715e-05
+  },
+  {
+    "epoch": 104,
+    "train": {
+      "total": 0.5988839228947958,
+      "data": 0.22798373699188232,
+      "physics": 1.965287152926127,
+      "boundary": 0.06158656552433968,
+      "mass_residual": 0.48339903354644775,
+      "vz_residual": 5.117287476857503,
+      "vxy_residual": 0.4744289716084798,
+      "smooth_z": 1.0247803820806478e-11,
+      "smooth_vz": 2.5649499538205057e-11
+    },
+    "val": {
+      "total": 0.6061380704243978,
+      "data": 0.24410635232925415,
+      "physics": 2.1433536211649575,
+      "boundary": 0.06482283150156339,
+      "mass_residual": 0.5189653635025024,
+      "vz_residual": 3.571516752243042,
+      "vxy_residual": 0.4729081292947133,
+      "smooth_z": 1.0686092057528759e-11,
+      "smooth_vz": 3.047109035000014e-11
+    },
+    "lr": 4.4184043907520803e-05
+  },
+  {
+    "epoch": 105,
+    "train": {
+      "total": 0.6114368875821431,
+      "data": 0.23754130105177562,
+      "physics": 1.9823861598968506,
+      "boundary": 0.06449224452177683,
+      "mass_residual": 0.49311246871948244,
+      "vz_residual": 4.384726190567017,
+      "vxy_residual": 0.4390002409617106,
+      "smooth_z": 1.037560523609038e-11,
+      "smooth_vz": 2.5313942608740093e-11
+    },
+    "val": {
+      "total": 0.6152374943097433,
+      "data": 0.237504909435908,
+      "physics": 2.125789999961853,
+      "boundary": 0.06694612155357997,
+      "mass_residual": 0.5149770478407542,
+      "vz_residual": 3.783085346221924,
+      "vxy_residual": 0.44393696387608844,
+      "smooth_z": 1.05704490299674e-11,
+      "smooth_vz": 2.7284126347115745e-11
+    },
+    "lr": 3.902217351061227e-05
+  },
+  {
+    "epoch": 106,
+    "train": {
+      "total": 0.6242997884750366,
+      "data": 0.25183505614598595,
+      "physics": 1.9534398317337036,
+      "boundary": 0.06644149745504062,
+      "mass_residual": 0.511292843023936,
+      "vz_residual": 3.8333314259847007,
+      "vxy_residual": 0.41272579034169515,
+      "smooth_z": 1.0421729104703736e-11,
+      "smooth_vz": 2.5075081825735405e-11
+    },
+    "val": {
+      "total": 0.6288128892580668,
+      "data": 0.2640875081221263,
+      "physics": 2.139657656351725,
+      "boundary": 0.06854446480671565,
+      "mass_residual": 0.5513749420642853,
+      "vz_residual": 2.652329365412394,
+      "vxy_residual": 0.42450299859046936,
+      "smooth_z": 1.0875266832910402e-11,
+      "smooth_vz": 2.8115773598180738e-11
+    },
+    "lr": 3.417657696464772e-05
+  }
+]

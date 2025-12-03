@@ -10,6 +10,10 @@
    - 5. [Direction C1: Enhanced Hybrid PINN](#5-direction-c1-enhanced-hybrid-pinn)
    - 6. [Direction C2: Shared Stem + Dedicated Branches](#6-direction-c2-shared-stem--dedicated-branches)
    - 7. [Direction D: Dependency-Aware Backbone + Causal Heads](#7-direction-d-dependency-aware-backbone--causal-heads)
+     - 7.6. [Direction D1.5: Soft-Physics Dependency Backbone](#76-direction-d15-soft-physics-dependency-backbone)
+     - 7.7. [Direction D1.5.1: Position-Velocity Consistency](#77-direction-d151-position-velocity-consistency)
+     - 7.8. [Direction D1.5.2: Horizontal Motion Suppression](#78-direction-d152-horizontal-motion-suppression)
+   - 7. [Direction D: Dependency-Aware Backbone + Causal Heads](#7-direction-d-dependency-aware-backbone--causal-heads)
 
 ---
 
@@ -1445,22 +1449,327 @@ context → ContextEncoder ----┤
 
 ---
 
-### 7.6 Direction D1.5 (Soft Physics Upgrade)
+### 7.6 Direction D1.5: Soft-Physics Dependency Backbone
 
-- **Goal**: Blend Direction D accuracy with D1 smoothness without incurring D1’s integration bias.
-- **Architectural changes**:
-  - Shared backbone + dependency heads identical to Direction D.
-  - Optional 6D rotation head (default ON) with on-the-fly conversion back to quaternions.
-  - Optional monotonic mass reconstruction using context `m₀` + cumulative negative `softplus` deltas.
-- **Loss extensions**:
-  - Mass ODE residual: `dm/dt + T/(Isp g0)` using context `T_max`, `Isp`.
-  - Vertical drag/thrust residual: `dvz/dt - a_z^{phys}` with simple aero model (`rho(z)`, `Cd`).
-  - Optional horizontal drag residuals (light weight) + curvature penalties on `z` and `v_z`.
-- **Training schedule**:
-  - Phase 1 (70–80% epochs): data-only (all soft weights forced to 0).
-  - Phase 2: cosine ramp of λ_mass / λ_vz to 0.05, smoothing to 1e-4.
-  - Mass data component weight boosted (≈4×) to keep physics loss from flattening the burn profile.
-- **Expected outcome**: inherits D’s low bias while suppressing jagged altitude/velocity traces; retains compatibility with fast evaluation (no integrator, no latent dynamics).
-4. **Curriculum for Ordered Heads** – Because G1 depends on G2/G3, freezing G1 for a few epochs may stabilize early training.
+**Date**: 2025-11-25  
+**Experiment**: exp8_25_11_direction_d15_soft_physics  
+**Total RMSE**: **0.199** ✅ (best so far)
+
+#### 7.6.1 What Changed Compared to Direction D1
+
+**Key Architectural Changes:**
+
+1. **Optional 6D Rotation Representation** (Default: Enabled)
+   - **Direction D1**: Always uses 6D rotation representation with physics-aware features
+   - **Direction D1.5**: Optional 6D rotation (configurable via `use_rotation_6d: true`)
+   - **Purpose**: Provides smoother attitude predictions without quaternion normalization issues
+   - **Implementation**: 6D rotation → rotation matrix → quaternion conversion
+
+2. **Optional Structural Mass Monotonicity** (Default: Enabled)
+   - **Direction D1**: Direct mass prediction
+   - **Direction D1.5**: Optional monotonic mass via `enforce_mass_monotonicity: true`
+   - **Method**: `mass_delta = -softplus(m_pred_raw)`, then `m = cumsum(mass_delta) + m0`
+   - **Purpose**: Structurally enforces `m(t+1) ≤ m(t)` without requiring loss penalties
+
+3. **Zero-Aero Handling**
+   - **New Feature**: Detects zero aerodynamic coefficients and forces identity rotation
+   - **Implementation**: `_is_zero_aero()` checks `Cd`, `CL_alpha`, `Cm_alpha` near zero
+   - **Behavior**: When aero is zero, forces identity quaternion `[1,0,0,0]` and zero angular velocity
+   - **Purpose**: Handles ballistic trajectories correctly
+
+**Preserved Components:**
+- Same shared backbone architecture (4×256 MLP)
+- Same dependency chain (G3 → G2 → G1)
+- Same input/output interface: `(t, context) → state`
+- No initial_state required
+
+**Loss Function Extensions:**
+
+1. **Soft Physics Residuals**:
+   - `lambda_mass_residual: 0.05` - Mass ODE residual: `dm/dt + T/(Isp*g0)`
+   - `lambda_vz_residual: 0.05` - Vertical acceleration residual: `dvz/dt - a_z^phys`
+   - `lambda_vxy_residual: 0.01` - Horizontal velocity residuals (light weight)
+
+2. **Curvature Penalties**:
+   - `lambda_smooth_z: 1e-4` - Second derivative penalty on altitude
+   - `lambda_smooth_vz: 1e-4` - Second derivative penalty on vertical velocity
+
+3. **Phase Schedule**:
+   - Phase 1 (75% epochs): Data-only training (all soft physics weights = 0)
+   - Phase 2 (25% epochs): Cosine ramp of soft physics weights to target values
+   - **Purpose**: Let model learn data patterns first, then refine with physics
+
+#### 7.6.2 Data Flow Diagram
+
+```
+Dataset (HDF5) → DataLoader
+    │
+    ├─ t: [batch, N, 1] ────────────────────┐
+    └─ context: [batch, 7] ─────────────────┤
+                                              │
+                                              ▼
+                                    ┌──────────────────┐
+                                    │ Feature Encoding │
+                                    │                  │
+                                    │ 1. FourierFeatures│
+                                    │    → [batch,N,17]│
+                                    │                  │
+                                    │ 2. ContextEncoder│
+                                    │    → [batch,N,32]│
+                                    │                  │
+                                    │ 3. Concatenate   │
+                                    │    → [batch,N,49]│
+                                    └────────┬─────────┘
+                                             │
+                                    ┌────────▼─────────┐
+                                    │ Shared Backbone  │
+                                    │ MLP 4×256        │
+                                    └────────┬─────────┘
+                                             │
+                                             │ latent: [batch, N, 256]
+                                             │
+                                    ┌────────▼─────────┐
+                                    │ G3: Mass Head   │
+                                    │ [256→128→64→1]  │
+                                    └────────┬─────────┘
+                                             │
+                                             │ m_pred_raw: [batch, N, 1]
+                                             │
+                                    ┌────────▼─────────┐
+                                    │ Mass Monotonicity │
+                                    │ (if enabled)     │
+                                    │ -softplus(delta) │
+                                    │ cumsum + m0      │
+                                    └────────┬─────────┘
+                                             │
+                                             │ m_pred: [batch, N, 1]
+                                             │
+                                    ┌────────▼─────────┐
+                                    │ G2: Attitude Head│
+                                    │ Input: [latent||m]│
+                                    │ [257→256→128→64→9]│
+                                    └────────┬─────────┘
+                                             │
+                                             │ att_output: [batch, N, 9]
+                                             │ (6D rot + 3 ω)
+                                             │
+                                    ┌────────▼─────────┐
+                                    │ Zero-Aero Check  │
+                                    │ (if zero → identity)│
+                                    └────────┬─────────┘
+                                             │
+                                    ┌────────▼─────────┐
+                                    │ 6D → Rotation Matrix│
+                                    │ → Quaternion      │
+                                    └────────┬─────────┘
+                                             │
+                                             │ q_pred, w_pred
+                                             │
+                                    ┌────────▼─────────┐
+                                    │ G1: Translation  │
+                                    │ Input: [latent||m||q||w]│
+                                    │ [264→256→128→128→64→6]│
+                                    └────────┬─────────┘
+                                             │
+                                             │ x,y,z,vx,vy,vz
+                                             │
+                                    ┌────────▼─────────┐
+                                    │ Concatenate      │
+                                    │ [x||v||q||w||m]  │
+                                    └────────┬─────────┘
+                                             │
+                                             │ state: [batch, N, 14]
+                                             │
+                                             ▼
+                                    ┌──────────────────┐
+                                    │ Loss Function    │
+                                    │ Data + Soft Phys │
+                                    │ + Smoothing      │
+                                    └──────────────────┘
+```
+
+#### 7.6.3 Why It Would Be Better
+
+1. **Structural Mass Constraints**: Monotonic mass enforcement via architecture, not loss penalties
+2. **Smoother Trajectories**: Curvature penalties reduce jagged altitude/velocity traces
+3. **Physics Guidance**: Soft residuals guide model toward physically plausible solutions
+4. **Zero-Aero Robustness**: Handles ballistic trajectories correctly
+5. **Phase Training**: Data-first approach prevents physics loss from interfering with learning
+
+#### 7.6.4 Results (exp8)
+
+| Metric | Value |
+|--------|-------|
+| **Total RMSE** | **0.199** ✅ |
+| **Translation RMSE** | 0.268 |
+| **Rotation RMSE** | 0.132 |
+| **Mass RMSE** | 0.018 |
+| **Quaternion Norm** | 1.0 (perfect) |
+
+**Key Observations:**
+- ✅ Best total RMSE achieved so far (0.199)
+- ✅ Excellent mass prediction (0.018 RMSE)
+- ✅ Perfect quaternion normalization
+- ⚠️ Still some vertical dynamics errors (vz: 0.59, z: 0.07)
+
+---
+
+### 7.7 Direction D1.5.1: Position-Velocity Consistency
+
+**Date**: 2025-11-25  
+**Experiment**: exp9_25_11_direction_d151_pos_vel_consistency  
+**Total RMSE**: **0.200**
+
+#### 7.7.1 What Changed Compared to Direction D1.5
+
+**Key Loss Function Extensions:**
+
+1. **Position-Velocity Consistency Loss**:
+   - `lambda_pos_vel: 0.5` - Enforces `v = dx/dt` relationship
+   - **Purpose**: Ensures predicted velocities match position derivatives
+   - **Implementation**: `L_pos_vel = ||v_pred - d(x_pred)/dt||²`
+
+2. **Position Smoothing**:
+   - `lambda_smooth_pos: 1e-3` - Second derivative penalty on all position components (x, y, z)
+   - **Purpose**: Reduces position oscillations and improves trajectory smoothness
+   - **Stronger than D1.5**: 10× higher weight (1e-3 vs 1e-4 for z only)
+
+3. **Adjusted Phase Schedule**:
+   - Phase 1 ratio: 60% (vs 75% in D1.5)
+   - **Purpose**: Earlier introduction of physics constraints
+
+**Preserved Components:**
+- Same architecture as D1.5
+- Same soft physics residuals
+- Same mass monotonicity enforcement
+
+#### 7.7.2 Why It Would Be Better
+
+1. **Kinematic Consistency**: Position-velocity consistency ensures trajectories are kinematically valid
+2. **Smoother Positions**: Position smoothing reduces oscillations in all axes
+3. **Earlier Physics**: Phase schedule adjustment allows physics to guide learning earlier
+
+#### 7.7.3 Results (exp9)
+
+| Metric | Value |
+|--------|-------|
+| **Total RMSE** | 0.200 |
+| **Translation RMSE** | 0.270 |
+| **Rotation RMSE** | 0.131 |
+| **Mass RMSE** | 0.019 |
+
+**Key Observations:**
+- Similar performance to D1.5 (0.200 vs 0.199)
+- Slightly better rotation RMSE (0.131 vs 0.132)
+- Position-velocity consistency helps but doesn't dramatically improve overall RMSE
+
+---
+
+### 7.8 Direction D1.5.2: Horizontal Motion Suppression
+
+**Date**: 2025-11-26, 2025-11-29  
+**Experiments**: exp10_26_11, exp11_29_11_direction_d152_horizontal_suppression  
+**Total RMSE**: **0.198** ✅ (exp11, best overall)
+
+#### 7.8.1 What Changed Compared to Direction D1.5.1
+
+**Key Loss Function Extensions:**
+
+1. **Horizontal Velocity Suppression**:
+   - `lambda_zero_vxy: 1.0` - Penalizes non-zero horizontal velocities (vx, vy)
+   - **Purpose**: Suppresses horizontal motion for vertical ascent trajectories
+   - **Implementation**: `L_zero_vxy = ||vx||² + ||vy||²`
+
+2. **Horizontal Acceleration Suppression**:
+   - `lambda_zero_axy: 1.0` - Penalizes non-zero horizontal accelerations (ax, ay)
+   - **Purpose**: Ensures horizontal forces are minimal
+   - **Implementation**: `L_zero_axy = ||ax||² + ||ay||²`
+
+3. **Horizontal Acceleration Penalty**:
+   - `lambda_hacc: 0.02` - Penalizes horizontal acceleration magnitude
+   - **Purpose**: Additional regularization for horizontal motion
+
+4. **Horizontal Position Penalty**:
+   - `lambda_xy_zero: 5.0` - Strong penalty on horizontal positions (x, y)
+   - **Purpose**: Forces trajectories to stay near vertical axis
+   - **Strongest penalty**: 5.0 weight (vs 1.0 for velocities)
+
+5. **Enhanced Component Weights**:
+   - `x: 2.0`, `y: 2.0`, `z: 3.0` - Boosted weights for position components
+   - **Purpose**: Emphasize vertical motion accuracy
+
+6. **Adjusted Phase Schedule**:
+   - Phase 1 ratio: 55% (vs 60% in D1.5.1)
+   - Extended training: 160 epochs (vs 120)
+   - Phase 2 early stopping patience: 40 (vs 15)
+
+**Preserved Components:**
+- Same architecture as D1.5
+- All D1.5.1 loss terms (position-velocity consistency, position smoothing)
+- All D1.5 soft physics residuals
+
+#### 7.8.2 Why It Would Be Better
+
+1. **Vertical Trajectory Focus**: Horizontal suppression forces model to focus on vertical ascent
+2. **Reduced Horizontal Drift**: Strong penalties prevent unwanted horizontal motion
+3. **Better Vertical Accuracy**: By suppressing horizontal motion, model can allocate more capacity to vertical dynamics
+4. **Extended Training**: Longer training with adjusted phase schedule allows better convergence
+
+#### 7.8.3 Results
+
+**exp10 (2025-11-26)**:
+| Metric | Value |
+|--------|-------|
+| **Total RMSE** | 0.200 |
+| **Translation RMSE** | 0.270 |
+| **Rotation RMSE** | 0.131 |
+| **Mass RMSE** | 0.019 |
+
+**exp11 (2025-11-29)** - **Best Overall**:
+| Metric | Value |
+|--------|-------|
+| **Total RMSE** | **0.198** ✅✅ |
+| **Translation RMSE** | 0.266 |
+| **Rotation RMSE** | 0.132 |
+| **Mass RMSE** | 0.015 |
+| **Quaternion Norm** | 1.0 (perfect) |
+
+**Key Observations:**
+- ✅✅ Best total RMSE achieved (0.198)
+- ✅ Best mass RMSE (0.015)
+- ✅ Improved vertical position (z: 0.064 vs 0.074 in exp10)
+- ⚠️ Slight degradation in horizontal positions (x, y) due to suppression penalties
+- ✅ Perfect quaternion normalization maintained
+
+**Position Stability Analysis (exp10 vs exp11)**:
+- Z position improved by 14% (0.074 → 0.064)
+- X, Y positions degraded by ~10% (due to suppression)
+- Overall translation RMSE improved by 1.4%
+
+---
+
+### 7.9 Direction D1.5 Series Summary
+
+**Evolution Path**: D → D1 → D1.5 → D1.5.1 → D1.5.2
+
+| Direction | Key Innovation | Total RMSE | Best Component |
+|-----------|----------------|------------|----------------|
+| **D** | Dependency-aware backbone | 0.300 | Fast training |
+| **D1** | Physics-aware + RK4 | 0.285 | Translation |
+| **D1.5** | Soft physics + mass monotonicity | 0.199 | Mass (0.018) |
+| **D1.5.1** | Position-velocity consistency | 0.200 | Rotation (0.131) |
+| **D1.5.2** | Horizontal suppression | **0.198** ✅ | Mass (0.015) |
+
+**Key Achievements:**
+1. **Best Overall RMSE**: 0.198 (D1.5.2 exp11) - 34% better than Direction D baseline
+2. **Perfect Quaternion Normalization**: All D1.5 variants maintain unit quaternions
+3. **Structural Mass Constraints**: Monotonic mass without loss penalties
+4. **Physics-Guided Training**: Soft residuals improve trajectory smoothness
+5. **Vertical Focus**: Horizontal suppression improves vertical dynamics accuracy
+
+**Remaining Challenges:**
+1. Vertical velocity errors (vz: ~0.59) still significant
+2. Rotation RMSE (0.13) could be improved further
+3. Trade-off between horizontal suppression and horizontal position accuracy
 
 Direction D offers a low-latency alternative to the hybrid stack, while Direction D1 re-introduces physics structure without Shared Stem + Latent ODE overhead. Both will act as baselines for future Direction E ideas.

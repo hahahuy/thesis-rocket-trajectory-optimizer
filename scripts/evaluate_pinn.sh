@@ -1,5 +1,13 @@
 #!/bin/bash
 # Flexible evaluation wrapper that delegates to run_evaluation.py
+#
+# This script generates evaluation plots including:
+# - Trajectory comparison plots (2D time series)
+# - 3D trajectory plots with Parameters & Summary table
+#   (showing initial parameters and trajectory statistics)
+#
+# The Parameters & Summary table is automatically included in 3D plots
+# when context data is available from the dataset.
 
 set -euo pipefail
 

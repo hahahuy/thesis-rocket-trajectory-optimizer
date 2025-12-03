@@ -556,9 +556,129 @@ model:
 - Direction D delivered low RMSE but noisy z/vz traces; Direction D1 was smoother but biased mass.
 - D1.5 keeps pure data predictions (no integrator) while letting the loss gently penalize non-physical trends, reducing noise without collapsing mass dynamics.
 
-### Status
-- ✅ Code integrated; ready for experiments (`exp8_direction_d15_soft_physics` planned).
-- ✅ Pending: long-run training/validation results + residual ablations. (best rmse result in every model, although performing position weirdly)
+### Implementation Status
+- ✅ Code integrated and tested
+- ✅ `exp8_25_11_direction_d15_soft_physics` completed (RMSE: **0.199** ✅)
+- ✅ Best total RMSE achieved so far
+- ✅ Perfect quaternion normalization (norm = 1.0)
+- ✅ Excellent mass prediction (RMSE: 0.018)
+
+### Results (exp8)
+- **Total RMSE**: 0.199 ✅
+- **Translation RMSE**: 0.268
+- **Rotation RMSE**: 0.132
+- **Mass RMSE**: 0.018 (excellent)
+- **Quaternion Norm**: 1.0 (perfect)
+
+### Notes
+- Zero-aero handling ensures correct behavior for ballistic trajectories
+- Phase schedule (75% data-only) prevents physics loss from interfering with learning
+- Soft physics residuals improve trajectory smoothness without integration bias
+
+---
+
+## [2025-11-25] Direction D1.5.1 – Position-Velocity Consistency
+
+### Modified Files
+- **`configs/train_direction_d151.yaml`**
+  - Added position-velocity consistency loss (`lambda_pos_vel: 0.5`)
+  - Added position smoothing penalty (`lambda_smooth_pos: 1e-3`)
+  - Adjusted phase schedule (60% data-only vs 75% in D1.5)
+
+### Architecture Details
+- **Same architecture as D1.5**: No structural changes
+- **Loss Extensions**:
+  1. **Position-Velocity Consistency**: Enforces `v = dx/dt` relationship
+     - `lambda_pos_vel: 0.5`
+     - Ensures predicted velocities match position derivatives
+  2. **Position Smoothing**: Second derivative penalty on all positions (x, y, z)
+     - `lambda_smooth_pos: 1e-3` (10× stronger than D1.5's z-only smoothing)
+     - Reduces oscillations in all position components
+
+### Rationale
+- D1.5 achieved excellent RMSE but position-velocity relationship could be more consistent
+- Position smoothing helps reduce oscillations observed in D1.5
+- Earlier physics introduction (60% vs 75%) allows physics to guide learning sooner
+
+### Implementation Status
+- ✅ Code integrated
+- ✅ `exp9_25_11_direction_d151_pos_vel_consistency` completed (RMSE: 0.200)
+
+### Results (exp9)
+- **Total RMSE**: 0.200
+- **Translation RMSE**: 0.270
+- **Rotation RMSE**: 0.131 (slightly better than D1.5)
+- **Mass RMSE**: 0.019
+
+### Notes
+- Similar performance to D1.5
+- Position-velocity consistency helps but doesn't dramatically improve overall RMSE
+- Position smoothing reduces oscillations but may slightly increase RMSE
+
+---
+
+## [2025-11-26, 2025-11-29] Direction D1.5.2 – Horizontal Motion Suppression
+
+### Modified Files
+- **`configs/train_direction_d152.yaml`**
+  - Added horizontal motion suppression losses
+  - Enhanced component weights for positions
+  - Extended training schedule (160 epochs, adjusted phase ratio)
+
+### Architecture Details
+- **Same architecture as D1.5**: No structural changes
+- **Loss Extensions**:
+  1. **Horizontal Velocity Suppression**: `lambda_zero_vxy: 1.0`
+     - Penalizes non-zero horizontal velocities (vx, vy)
+  2. **Horizontal Acceleration Suppression**: `lambda_zero_axy: 1.0`
+     - Penalizes non-zero horizontal accelerations (ax, ay)
+  3. **Horizontal Acceleration Penalty**: `lambda_hacc: 0.02`
+     - Additional regularization for horizontal motion
+  4. **Horizontal Position Penalty**: `lambda_xy_zero: 5.0` (strongest)
+     - Forces trajectories to stay near vertical axis
+  5. **Enhanced Component Weights**:
+     - `x: 2.0`, `y: 2.0`, `z: 3.0` - Boosted position weights
+  6. **Extended Training**:
+     - 160 epochs (vs 120)
+     - Phase 1 ratio: 55% (vs 60% in D1.5.1)
+     - Phase 2 early stopping patience: 40 (vs 15)
+
+### Rationale
+- Vertical ascent trajectories should have minimal horizontal motion
+- Suppressing horizontal motion allows model to focus capacity on vertical dynamics
+- Strong penalties ensure trajectories stay near vertical axis
+
+### Implementation Status
+- ✅ Code integrated
+- ✅ `exp10_26_11_direction_d152_horizontal_suppression` completed (RMSE: 0.200)
+- ✅ `exp11_29_11_direction_d152_horizontal_suppression` completed (RMSE: **0.198** ✅✅)
+
+### Results
+
+**exp10 (2025-11-26)**:
+- **Total RMSE**: 0.200
+- **Translation RMSE**: 0.270
+- **Rotation RMSE**: 0.131
+- **Mass RMSE**: 0.019
+
+**exp11 (2025-11-29)** - **Best Overall**:
+- **Total RMSE**: **0.198** ✅✅ (best achieved)
+- **Translation RMSE**: 0.266
+- **Rotation RMSE**: 0.132
+- **Mass RMSE**: 0.015 (best mass RMSE)
+- **Quaternion Norm**: 1.0 (perfect)
+
+### Key Improvements (exp11 vs exp10)
+- Z position improved by 14% (0.074 → 0.064)
+- Overall translation RMSE improved by 1.4%
+- Mass RMSE improved by 21% (0.019 → 0.015)
+- Extended training and adjusted phase schedule contributed to improvements
+
+### Notes
+- Best total RMSE achieved across all architectures (0.198)
+- Horizontal suppression improves vertical dynamics but slightly degrades horizontal positions
+- Trade-off between horizontal suppression and horizontal position accuracy
+- Perfect quaternion normalization maintained across all D1.5 variants
 
 ---
 

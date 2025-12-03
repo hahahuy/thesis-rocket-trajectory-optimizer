@@ -1,0 +1,68 @@
+loss:
+  component_weights:
+    m: 1.0
+    q0: 1.5
+    q1: 1.5
+    q2: 1.5
+    q3: 1.5
+    vx: 1.0
+    vy: 1.0
+    vz: 2.5
+    wx: 1.0
+    wy: 1.0
+    wz: 1.0
+    x: 1.0
+    y: 1.0
+    z: 2.0
+  homotopy_schedule: linear
+  lambda_bc: 1.0
+  lambda_data: 1.0
+  lambda_mass: 1.0
+  lambda_mass_flow: 0.05
+  lambda_phys: 0.1
+  lambda_phys_final: 1.0
+  lambda_quat_norm: 0.1
+  lambda_rotation: 1.5
+  lambda_translation: 1.2
+model:
+  activation: tanh
+  debug_stats: true
+  dropout: 0.05
+  dynamics_n_hidden: 3
+  dynamics_n_neurons: 128
+  encoder_window: 10
+  fourier_features: 8
+  latent_dim: 64
+  layer_norm: true
+  mass_branch_dims:
+  - 64
+  rotation_branch_dims:
+  - 256
+  - 256
+  shared_stem_hidden_dim: 128
+  temporal_dim_feedforward: 512
+  temporal_n_heads: 4
+  temporal_n_layers: 4
+  temporal_type: transformer
+  transformer_activation: gelu
+  translation_branch_dims:
+  - 128
+  - 128
+  type: hybrid_c2
+physics_config: configs/phys.yaml
+scales_config: configs/scales.yaml
+train:
+  batch_size: 8
+  early_stopping_min_delta: 0.0
+  early_stopping_patience: 10
+  epochs: 100
+  experiment_name: hybrid_c2_improved
+  learning_rate: 1e-3
+  num_workers: 0
+  scheduler:
+    kwargs:
+      T_max: 100
+      eta_min: 1e-6
+    type: cosine
+  time_subsample: null
+  weight_decay: 1e-5

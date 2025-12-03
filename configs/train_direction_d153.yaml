@@ -1,0 +1,68 @@
+model:
+  type: direction_d15
+  fourier_features: 8
+  context_embedding_dim: 32
+  backbone_hidden_dims: [256, 256, 256, 256]
+  head_g3_hidden_dims: [128, 64]
+  head_g2_hidden_dims: [256, 128, 64]
+  head_g1_hidden_dims: [256, 128, 128, 64]
+  activation: gelu
+  layer_norm: true
+  dropout: 0.0
+  use_rotation_6d: true
+  enforce_mass_monotonicity: true
+
+train:
+  experiment_name: direction_d153_position_stability
+  batch_size: 8
+  num_workers: 0
+  epochs: 160
+  learning_rate: 1e-3
+  weight_decay: 1e-5
+  time_subsample: null
+  early_stopping_patience: 25
+  early_stopping_patience_phase2: 40
+  early_stopping_min_delta: 0.0
+  scheduler:
+    type: cosine
+    kwargs:
+      T_max: 160
+      eta_min: 1e-6
+
+loss:
+  lambda_data: 1.0
+  lambda_phys: 0.1
+  lambda_phys_final: 1.0
+  lambda_bc: 1.0
+  lambda_translation: 1.0
+  lambda_rotation: 1.0
+  lambda_mass: 1.0
+  # Soft physics residuals (D1.5)
+  lambda_mass_residual: 0.05
+  lambda_vz_residual: 0.05
+  lambda_vxy_residual: 0.01
+  lambda_smooth_z: 5.0e-4
+  lambda_smooth_vz: 1.0e-4
+  # Position-Velocity consistency + position smoothing (D1.51)
+  # Enhanced for better x, y, z stability
+  lambda_pos_vel: 1.0
+  lambda_smooth_pos: 2.0e-3
+  # Horizontal motion suppression (D1.52)
+  lambda_zero_vxy: 1.0
+  lambda_zero_axy: 1.0
+  lambda_hacc: 0.02
+  lambda_xy_zero: 5.0
+  lambda_quat_norm: 0.0
+  lambda_mass_flow: 0.0
+  homotopy_schedule: fixed
+  component_weights:
+    m: 4.0
+  phase_schedule:
+    enabled: true
+    phase1_ratio: 0.55
+    ramp: cosine
+
+physics_config: configs/phys.yaml
+scales_config: configs/scales.yaml
+
+

@@ -50,6 +50,11 @@ class PINNLoss(nn.Module):
         # Position-Velocity consistency + position smoothing (Direction D1.51)
         lambda_pos_vel: float = 0.0,
         lambda_smooth_pos: float = 0.0,
+        # Horizontal motion suppression (Direction D1.52)
+        lambda_zero_vxy: float = 0.0,
+        lambda_zero_axy: float = 0.0,
+        lambda_hacc: float = 0.0,
+        lambda_xy_zero: float = 0.0,
     ):
         super().__init__()
         
@@ -68,6 +73,10 @@ class PINNLoss(nn.Module):
         self.lambda_smooth_vz = lambda_smooth_vz
         self.lambda_pos_vel = lambda_pos_vel
         self.lambda_smooth_pos = lambda_smooth_pos
+        self.lambda_zero_vxy = lambda_zero_vxy
+        self.lambda_zero_axy = lambda_zero_axy
+        self.lambda_hacc = lambda_hacc
+        self.lambda_xy_zero = lambda_xy_zero
         
         self.physics_params = physics_params or {}
         self.scales = scales or {}
@@ -225,31 +234,216 @@ class PINNLoss(nn.Module):
         state: torch.Tensor,
     ) -> torch.Tensor:
         """
-        Light Position Smoothing Loss (XSmooth-Loss).
+        Position Smoothing Loss (3D).
         
-        Penalizes high-frequency curvature in X/Y trajectories using second-order
+        Penalizes high-frequency curvature in X/Y/Z trajectories using second-order
         discrete derivative (curvature): c(t) = x(t+1) - 2*x(t) + x(t-1)
         
         Args:
             state: [batch, N, 14] - predicted state
             
         Returns:
-            Scalar loss (only for x and y, not z)
+            Scalar loss (for x, y, z - all 3D position components)
         """
-        # Extract x and y positions: [batch, N, 2]
-        xy_positions = state[..., 0:2]  # [batch, N, 2]
+        # Extract all position components: [batch, N, 3] (x, y, z)
+        positions = state[..., 0:3]  # [batch, N, 3]
         
-        if xy_positions.shape[1] < 3:
+        if positions.shape[1] < 3:
             return torch.tensor(0.0, device=state.device, dtype=state.dtype)
         
         # Compute curvature: c(t) = x(t+1) - 2*x(t) + x(t-1)
-        # For indices 1..N-2: curvature[:, i] = xy[:, i+1] - 2*xy[:, i] + xy[:, i-1]
+        # For indices 1..N-2: curvature[:, i] = pos[:, i+1] - 2*pos[:, i] + pos[:, i-1]
         curvature = (
-            xy_positions[:, 2:, :] - 2.0 * xy_positions[:, 1:-1, :] + xy_positions[:, :-2, :]
-        )  # [batch, N-2, 2]
+            positions[:, 2:, :] - 2.0 * positions[:, 1:-1, :] + positions[:, :-2, :]
+        )  # [batch, N-2, 3]
         
         # Loss: mean of squared curvature
         loss = torch.mean(curvature ** 2)
+        return loss
+
+    def _zero_horizontal_velocity_loss(
+        self,
+        pred_state: torch.Tensor,
+        true_state: torch.Tensor,
+        v_thresh: float = 1e-3,
+    ) -> torch.Tensor:
+        """
+        Zero horizontal velocity loss (D1.52).
+        
+        Forces predicted horizontal velocities to be near zero where true
+        horizontal velocities are near zero (vertical-only segments).
+        
+        Args:
+            pred_state: [batch, N, 14] - predicted state
+            true_state: [batch, N, 14] - true state
+            v_thresh: Threshold for detecting zero horizontal velocity
+            
+        Returns:
+            Scalar loss
+        """
+        # Ensure batched format
+        if pred_state.dim() == 2:
+            pred_state = pred_state.unsqueeze(0)
+            true_state = true_state.unsqueeze(0)
+        
+        # Extract horizontal velocities
+        vx_pred = pred_state[..., 3:4]  # [batch, N, 1]
+        vy_pred = pred_state[..., 4:5]  # [batch, N, 1]
+        vx_true = true_state[..., 3:4]  # [batch, N, 1]
+        vy_true = true_state[..., 4:5]  # [batch, N, 1]
+        
+        # Create mask: 1 where horizontal true velocity is (almost) zero
+        mask_zero_xy = (
+            (vx_true.abs() < v_thresh) & (vy_true.abs() < v_thresh)
+        ).float()  # [batch, N, 1]
+        
+        # Loss: penalize predicted horizontal velocity where mask is active
+        loss = (mask_zero_xy * (vx_pred**2 + vy_pred**2)).mean()
+        return loss
+
+    def _zero_horizontal_acceleration_loss(
+        self,
+        pred_state: torch.Tensor,
+        true_state: torch.Tensor,
+        t: torch.Tensor,
+        v_thresh: float = 1e-3,
+    ) -> torch.Tensor:
+        """
+        Zero horizontal acceleration loss (D1.52).
+        
+        Forces predicted horizontal accelerations to be near zero where true
+        horizontal velocities are near zero (vertical-only segments).
+        
+        Args:
+            pred_state: [batch, N, 14] - predicted state
+            true_state: [batch, N, 14] - true state
+            t: [batch, N, 1] - time grid
+            v_thresh: Threshold for detecting zero horizontal velocity
+            
+        Returns:
+            Scalar loss
+        """
+        # Ensure batched format
+        if pred_state.dim() == 2:
+            pred_state = pred_state.unsqueeze(0)
+            true_state = true_state.unsqueeze(0)
+            t = t.unsqueeze(0)
+        
+        if pred_state.shape[1] < 2:
+            return torch.tensor(0.0, device=pred_state.device, dtype=pred_state.dtype)
+        
+        # Extract horizontal velocities
+        vx_pred = pred_state[..., 3:4]  # [batch, N, 1]
+        vy_pred = pred_state[..., 4:5]  # [batch, N, 1]
+        vx_true = true_state[..., 3:4]  # [batch, N, 1]
+        vy_true = true_state[..., 4:5]  # [batch, N, 1]
+        
+        # Compute time differences
+        dt = t[:, 1:, 0] - t[:, :-1, 0]  # [batch, N-1]
+        dt = dt.clamp_min(self._eps).unsqueeze(-1)  # [batch, N-1, 1]
+        
+        # Compute predicted horizontal acceleration from finite differences
+        vx_mid = vx_pred[:, 1:, :] - vx_pred[:, :-1, :]  # [batch, N-1, 1]
+        vy_mid = vy_pred[:, 1:, :] - vy_pred[:, :-1, :]  # [batch, N-1, 1]
+        ax_pred = vx_mid / dt  # [batch, N-1, 1]
+        ay_pred = vy_mid / dt  # [batch, N-1, 1]
+        
+        # Create mask for midpoints: both endpoints should have zero horizontal velocity
+        mask_zero_xy = (
+            (vx_true.abs() < v_thresh) & (vy_true.abs() < v_thresh)
+        ).float()  # [batch, N, 1]
+        mask_mid = mask_zero_xy[:, 1:, :] * mask_zero_xy[:, :-1, :]  # [batch, N-1, 1]
+        
+        # Loss: penalize predicted horizontal acceleration where mask is active
+        loss = (mask_mid * (ax_pred**2 + ay_pred**2)).mean()
+        return loss
+
+    def _global_horizontal_acceleration_loss(
+        self,
+        pred_state: torch.Tensor,
+        t: torch.Tensor,
+    ) -> torch.Tensor:
+        """
+        Global horizontal acceleration limiter (D1.52).
+        
+        Keeps lateral motion small and smooth across all cases, without
+        forcing it to zero. Applied globally (no masking).
+        
+        Args:
+            pred_state: [batch, N, 14] - predicted state
+            t: [batch, N, 1] - time grid
+            
+        Returns:
+            Scalar loss
+        """
+        # Ensure batched format
+        if pred_state.dim() == 2:
+            pred_state = pred_state.unsqueeze(0)
+            t = t.unsqueeze(0)
+        
+        if pred_state.shape[1] < 2:
+            return torch.tensor(0.0, device=pred_state.device, dtype=pred_state.dtype)
+        
+        # Extract horizontal velocities
+        vx_pred = pred_state[..., 3:4]  # [batch, N, 1]
+        vy_pred = pred_state[..., 4:5]  # [batch, N, 1]
+        
+        # Compute time differences
+        dt = t[:, 1:, 0] - t[:, :-1, 0]  # [batch, N-1]
+        dt = dt.clamp_min(self._eps).unsqueeze(-1)  # [batch, N-1, 1]
+        
+        # Compute predicted horizontal acceleration from finite differences
+        vx_mid = vx_pred[:, 1:, :] - vx_pred[:, :-1, :]  # [batch, N-1, 1]
+        vy_mid = vy_pred[:, 1:, :] - vy_pred[:, :-1, :]  # [batch, N-1, 1]
+        ax_pred = vx_mid / dt  # [batch, N-1, 1]
+        ay_pred = vy_mid / dt  # [batch, N-1, 1]
+        
+        # Loss: mean squared horizontal acceleration (no masking)
+        loss = (ax_pred**2 + ay_pred**2).mean()
+        return loss
+
+    def _xy_zero_position_loss(
+        self,
+        pred_state: torch.Tensor,
+        true_state: torch.Tensor,
+        v_thresh: float = 1e-3,
+    ) -> torch.Tensor:
+        """
+        Upweighted x/y position error when true x/y ≈ 0 (D1.52).
+        
+        Tells the model that for vertical-only timesteps, any lateral
+        displacement is expensive.
+        
+        Args:
+            pred_state: [batch, N, 14] - predicted state
+            true_state: [batch, N, 14] - true state
+            v_thresh: Threshold for detecting zero horizontal velocity
+            
+        Returns:
+            Scalar loss
+        """
+        # Ensure batched format
+        if pred_state.dim() == 2:
+            pred_state = pred_state.unsqueeze(0)
+            true_state = true_state.unsqueeze(0)
+        
+        # Extract positions
+        x_pred = pred_state[..., 0:1]  # [batch, N, 1]
+        y_pred = pred_state[..., 1:2]  # [batch, N, 1]
+        x_true = true_state[..., 0:1]  # [batch, N, 1]
+        y_true = true_state[..., 1:2]  # [batch, N, 1]
+        
+        # Extract horizontal velocities for masking
+        vx_true = true_state[..., 3:4]  # [batch, N, 1]
+        vy_true = true_state[..., 4:5]  # [batch, N, 1]
+        
+        # Create mask: 1 where horizontal true velocity is (almost) zero
+        mask_zero_xy = (
+            (vx_true.abs() < v_thresh) & (vy_true.abs() < v_thresh)
+        ).float()  # [batch, N, 1]
+        
+        # Loss: penalize x/y position error where mask is active
+        loss = (mask_zero_xy * ((x_pred - x_true)**2 + (y_pred - y_true)**2)).mean()
         return loss
 
     def _get_param(self, name: str, default: float) -> torch.Tensor:
@@ -592,6 +786,10 @@ class PINNLoss(nn.Module):
         L_smooth_vz = torch.tensor(0.0, device=pred_state.device)
         L_pos_vel = torch.tensor(0.0, device=pred_state.device)
         L_smooth_pos = torch.tensor(0.0, device=pred_state.device)
+        L_zero_vxy = torch.tensor(0.0, device=pred_state.device)
+        L_zero_axy = torch.tensor(0.0, device=pred_state.device)
+        L_hacc = torch.tensor(0.0, device=pred_state.device)
+        L_xy_zero = torch.tensor(0.0, device=pred_state.device)
 
         if (
             self.lambda_mass_residual > 0.0
@@ -628,6 +826,18 @@ class PINNLoss(nn.Module):
 
         if self.lambda_smooth_pos > 0.0:
             L_smooth_pos = self._position_smoothing_loss(pred_state)
+
+        if self.lambda_zero_vxy > 0.0:
+            L_zero_vxy = self._zero_horizontal_velocity_loss(pred_state, true_state)
+
+        if self.lambda_zero_axy > 0.0:
+            L_zero_axy = self._zero_horizontal_acceleration_loss(pred_state, true_state, t)
+
+        if self.lambda_hacc > 0.0:
+            L_hacc = self._global_horizontal_acceleration_loss(pred_state, t)
+
+        if self.lambda_xy_zero > 0.0:
+            L_xy_zero = self._xy_zero_position_loss(pred_state, true_state)
         
         total_loss = (
             self.lambda_data * L_data
@@ -642,6 +852,10 @@ class PINNLoss(nn.Module):
             + self.lambda_smooth_vz * L_smooth_vz
             + self.lambda_pos_vel * L_pos_vel
             + self.lambda_smooth_pos * L_smooth_pos
+            + self.lambda_zero_vxy * L_zero_vxy
+            + self.lambda_zero_axy * L_zero_axy
+            + self.lambda_hacc * L_hacc
+            + self.lambda_xy_zero * L_xy_zero
         )
         
         loss_dict = {
@@ -658,6 +872,10 @@ class PINNLoss(nn.Module):
             "smooth_vz": L_smooth_vz,
             "pos_vel": L_pos_vel,
             "smooth_pos": L_smooth_pos,
+            "zero_vxy": L_zero_vxy.detach(),
+            "zero_axy": L_zero_axy.detach(),
+            "hacc": L_hacc.detach(),
+            "xy_zero": L_xy_zero.detach(),
         }
         
         return total_loss, loss_dict

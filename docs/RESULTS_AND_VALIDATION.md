@@ -21,6 +21,12 @@ This document provides comprehensive validation results across all work packages
    - [exp5: Hybrid C3 Full](#exp5-hybrid-c3-full)
    - [exp6: Direction D Baseline](#exp6-direction-d-baseline)
    - [exp7: Direction D1 Baseline](#exp7-direction-d1-baseline)
+   - [exp8: Direction D1.5 Soft Physics](#exp8-direction-d15-soft-physics)
+   - [exp9: Direction D1.5.1 Position-Velocity Consistency](#exp9-direction-d151-position-velocity-consistency)
+   - [exp10: Direction D1.5.2 Horizontal Suppression (v1)](#exp10-direction-d152-horizontal-suppression-v1)
+   - [exp11: Direction D1.5.2 Horizontal Suppression (v2)](#exp11-direction-d152-horizontal-suppression-v2)
+   - [exp6: Direction D Baseline](#exp6-direction-d-baseline)
+   - [exp7: Direction D1 Baseline](#exp7-direction-d1-baseline)
 6. [Cross-WP Integration Testing](#cross-wp-integration-testing)
 
 ---
@@ -442,34 +448,192 @@ WP4 models are validated using:
 
 ### Experiment Performance Ranking
 
-| Rank | Experiment | Total RMSE | Rotation RMSE | Notes |
-|------|------------|------------|---------------|-------|
-| 1 | **exp7** (Direction D1) | **0.285** ✅ | 0.188 | Best overall RMSE; needs 6D rot tuning |
-| 2 | **exp6** (Direction D) | 0.300 ✅ | 0.127 | Fastest training; dependency chain works |
-| 3 | **exp1** (Baseline) | 0.839 | 0.111 | Reference vanilla PINN |
-| 4 | **exp2** (Sequence) | 0.856 | **0.047** ✅✅ | Best rotation accuracy |
-| 5 | **exp3** (C2) | 0.960 | 0.378 ❌ | Worst rotation |
-| 6 | **exp4** (C2 Weighted) | 1.005 ❌ | 0.378 ❌ | Mass violations |
-| 7 | **exp5** (C3) | 1.073 ❌ | 0.378 | Needs further tuning |
+| Rank | Experiment | Total RMSE | Rotation RMSE | Mass RMSE | Notes |
+|------|------------|------------|---------------|-----------|-------|
+| 1 | **exp11** (Direction D1.5.2 v2) | **0.198** ✅✅ | 0.132 | **0.015** ✅ | Best overall; best mass |
+| 2 | **exp8** (Direction D1.5) | **0.199** ✅ | 0.132 | 0.018 | Best baseline D1.5 |
+| 3 | **exp9** (Direction D1.5.1) | 0.200 | **0.131** ✅ | 0.019 | Position-velocity consistency |
+| 4 | **exp10** (Direction D1.5.2 v1) | 0.200 | 0.131 | 0.019 | Horizontal suppression v1 |
+| 5 | **exp7** (Direction D1) | 0.285 | 0.188 | 0.137 | Physics-aware + RK4 |
+| 6 | **exp6** (Direction D) | 0.300 | 0.127 | 0.079 | Fastest training |
+| 7 | **exp1** (Baseline) | 0.839 | 0.111 | 0.143 | Reference vanilla PINN |
+| 8 | **exp2** (Sequence) | 0.856 | **0.047** ✅✅ | 0.156 | Best rotation accuracy |
+| 9 | **exp3** (C2) | 0.960 | 0.378 ❌ | 0.188 | Worst rotation |
+| 10 | **exp4** (C2 Weighted) | 1.005 ❌ | 0.378 ❌ | 0.138 | Mass violations |
+| 11 | **exp5** (C3) | 1.073 ❌ | 0.378 | 1.379 ❌ | Needs further tuning |
 
 ### Key Findings
 
-1. **Direction D1 (exp7)** now holds the best total RMSE (0.285) using dependency heads + physics-aware integration.
-2. **Direction D (exp6)** proves we can reach ≤0.30 RMSE with a pure MLP by enforcing mass→attitude→translation ordering.
-3. **Sequence Transformer (exp2)** still delivers the best rotation RMSE (0.047).
-4. **Hybrid C-series (exp3-5)** remain unstable without additional physics or integration upgrades.
-5. **Weighted-loss approach (exp4)** confirms penalties alone cannot fix mass/rotation issues.
+1. **Direction D1.5.2 (exp11)** achieves best total RMSE (0.198) and best mass RMSE (0.015) ✅✅
+2. **Direction D1.5 Series (exp8-11)** consistently achieve <0.20 RMSE, representing 34% improvement over Direction D baseline
+3. **Direction D1.5 (exp8)** establishes new baseline with soft physics and structural constraints
+4. **Direction D1.5.1 (exp9)** adds position-velocity consistency for kinematic validity
+5. **Direction D1.5.2 (exp10-11)** adds horizontal suppression to focus on vertical ascent
+6. **Direction D1 (exp7)** achieves 0.285 RMSE with physics-aware features and RK4 integration
+7. **Direction D (exp6)** achieves 0.300 RMSE with fast training and dependency-aware architecture
+8. **Sequence Transformer (exp2)** achieves best rotation RMSE (0.047) among early models
+9. **Baseline PINN (exp1)** serves as reference baseline (0.839 RMSE)
+10. **Hybrid C-series (exp3-5)** remain unstable without additional physics or integration upgrades
+11. **Weighted-loss approach (exp4)** confirms penalties alone cannot fix mass/rotation issues
 
-### Upcoming: Direction D1.5 (exp8)
+### exp8: Direction D1.5 Soft Physics
 
-- **Configuration**: `configs/train_direction_d15.yaml`
-- **Status**: 🔄 queued (training scheduled after D1 diagnostics).
-- **Highlights**:
-  - Shared backbone + dependency heads (mass → attitude → translation), optional 6D rotation head.
-  - Optional structural mass monotonicity seeded from context `m₀`.
-  - Soft physics residuals (mass ODE + vertical drag/thrust) and curvature penalties applied via loss.
-  - Two-phase schedule: first 75% epochs data-only; final 25% ramp λ_mass/λ_vz to 0.05, smoothing to 1e-4.
-- **Goal**: Retain Direction D accuracy (≤0.30 RMSE) while smoothing altitude/velocity traces and maintaining realistic mass burn.
+**Date**: 2025-11-25  
+**Model**: Direction D1.5 - Soft-Physics Dependency Backbone  
+**Experiment Directory**: `experiments/exp8_25_11_direction_d15_soft_physics/`
+
+#### Results
+
+| Metric | Value |
+|--------|-------|
+| **Total RMSE** | **0.199** ✅ (best so far) |
+| **Translation RMSE** | 0.268 |
+| **Rotation RMSE** | 0.132 |
+| **Mass RMSE** | **0.018** ✅ (excellent) |
+| **Quaternion Norm (mean)** | 1.0 (perfect) |
+| **Quaternion Norm (std)** | 7.7e-09 |
+
+#### Key Observations
+
+- ✅✅ Best total RMSE achieved so far (0.199)
+- ✅ Excellent mass prediction (0.018 RMSE)
+- ✅ Perfect quaternion normalization
+- ✅ Structural mass monotonicity working
+- ⚠️ Still some vertical dynamics errors (vz: 0.59, z: 0.07)
+
+#### Per-Component RMSE
+
+- Highest errors: `vz` (0.59), `q2` (0.34), `vx` (0.28)
+- Lowest errors: `y` (0.001), `vy` (0.002), `wx`, `wz` (< 0.001)
+
+#### Architecture Features
+
+- Optional 6D rotation representation (enabled)
+- Structural mass monotonicity (enforced)
+- Soft physics residuals (mass ODE, vertical dynamics)
+- Curvature penalties (z, vz smoothing)
+- Two-phase training (75% data-only, 25% physics ramp)
+
+---
+
+### exp9: Direction D1.5.1 Position-Velocity Consistency
+
+**Date**: 2025-11-25  
+**Model**: Direction D1.5.1 - Position-Velocity Consistency  
+**Experiment Directory**: `experiments/exp9_25_11_direction_d151_pos_vel_consistency/`
+
+#### Results
+
+| Metric | Value |
+|--------|-------|
+| **Total RMSE** | 0.200 |
+| **Translation RMSE** | 0.270 |
+| **Rotation RMSE** | **0.131** ✅ (slightly better) |
+| **Mass RMSE** | 0.019 |
+| **Quaternion Norm (mean)** | 1.0 (perfect) |
+| **Quaternion Norm (std)** | 9.0e-09 |
+
+#### Key Observations
+
+- Similar performance to D1.5 (0.200 vs 0.199)
+- Slightly better rotation RMSE (0.131 vs 0.132)
+- Position-velocity consistency helps but doesn't dramatically improve overall RMSE
+- Position smoothing reduces oscillations
+
+#### Per-Component RMSE
+
+- Highest errors: `vz` (0.60), `q2` (0.34), `vx` (0.27)
+- Lowest errors: `y` (0.002), `vy` (0.002), `wx`, `wz` (< 0.001)
+
+#### Architecture Features
+
+- All D1.5 features
+- Position-velocity consistency loss (`lambda_pos_vel: 0.5`)
+- Position smoothing on all axes (`lambda_smooth_pos: 1e-3`)
+- Adjusted phase schedule (60% data-only)
+
+---
+
+### exp10: Direction D1.5.2 Horizontal Suppression (v1)
+
+**Date**: 2025-11-26  
+**Model**: Direction D1.5.2 - Horizontal Motion Suppression  
+**Experiment Directory**: `experiments/exp10_26_11_direction_d152_horizontal_suppression/`
+
+#### Results
+
+| Metric | Value |
+|--------|-------|
+| **Total RMSE** | 0.200 |
+| **Translation RMSE** | 0.270 |
+| **Rotation RMSE** | 0.131 |
+| **Mass RMSE** | 0.019 |
+| **Quaternion Norm (mean)** | 1.0 (perfect) |
+| **Quaternion Norm (std)** | 9.0e-09 |
+
+#### Key Observations
+
+- Similar performance to D1.5.1
+- Horizontal suppression penalties added but not yet optimized
+- Extended training schedule (160 epochs)
+
+#### Architecture Features
+
+- All D1.5.1 features
+- Horizontal velocity suppression (`lambda_zero_vxy: 1.0`)
+- Horizontal acceleration suppression (`lambda_zero_axy: 1.0`)
+- Horizontal position penalty (`lambda_xy_zero: 5.0`)
+- Enhanced component weights (x: 2.0, y: 2.0, z: 3.0)
+
+---
+
+### exp11: Direction D1.5.2 Horizontal Suppression (v2)
+
+**Date**: 2025-11-29  
+**Model**: Direction D1.5.2 - Horizontal Motion Suppression (Optimized)  
+**Experiment Directory**: `experiments/exp11_29_11_direction_d152_horizontal_suppression/`
+
+#### Results
+
+| Metric | Value |
+|--------|-------|
+| **Total RMSE** | **0.198** ✅✅ (best overall) |
+| **Translation RMSE** | 0.266 |
+| **Rotation RMSE** | 0.132 |
+| **Mass RMSE** | **0.015** ✅ (best mass) |
+| **Quaternion Norm (mean)** | 1.0 (perfect) |
+| **Quaternion Norm (std)** | 8.4e-09 |
+
+#### Key Observations
+
+- ✅✅ Best total RMSE achieved across all architectures (0.198)
+- ✅ Best mass RMSE (0.015) - 21% better than exp10
+- ✅ Improved vertical position (z: 0.064 vs 0.074 in exp10)
+- ✅ Overall translation RMSE improved by 1.4%
+- ⚠️ Slight degradation in horizontal positions (x, y) due to suppression
+- ✅ Perfect quaternion normalization maintained
+
+#### Per-Component RMSE
+
+- Highest errors: `vz` (0.59), `q2` (0.34), `vx` (0.28)
+- Lowest errors: `y` (0.002), `vy` (0.001), `wx`, `wz` (< 0.001)
+- **Z position**: 0.064 (14% improvement over exp10)
+
+#### Architecture Features
+
+- All D1.5.2 features from exp10
+- Optimized training schedule and phase ratios
+- Extended training with adjusted early stopping
+
+#### Position Stability Analysis
+
+**exp10 vs exp11 Comparison**:
+- Z position: 0.074 → 0.064 (14% improvement) ✅
+- X position: 0.018 → 0.020 (10% degradation) ⚠️
+- Y position: 0.002 → 0.002 (similar)
+- Overall translation: 0.270 → 0.266 (1.4% improvement) ✅
+
+**Conclusion**: Horizontal suppression improves vertical dynamics but creates trade-off with horizontal position accuracy.
 
 ---
 

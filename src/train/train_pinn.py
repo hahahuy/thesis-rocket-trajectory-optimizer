@@ -152,6 +152,10 @@ class SoftLossScheduler:
             "lambda_smooth_vz",
             "lambda_pos_vel",
             "lambda_smooth_pos",
+            "lambda_zero_vxy",
+            "lambda_zero_axy",
+            "lambda_hacc",
+            "lambda_xy_zero",
         ]
         self.targets = {
             key: float(getattr(self.loss_fn, key, 0.0)) for key in self.keys
@@ -195,16 +199,9 @@ def train_epoch(
     """Train for one epoch."""
     model.train()
     total_loss = 0.0
-    loss_components = {
-        "data": 0.0,
-        "physics": 0.0,
-        "boundary": 0.0,
-        "mass_residual": 0.0,
-        "vz_residual": 0.0,
-        "vxy_residual": 0.0,
-        "smooth_z": 0.0,
-        "smooth_vz": 0.0,
-    }
+    # Initialize loss_components dynamically from loss_dict keys
+    # We'll accumulate all keys that appear in loss_dict
+    loss_components = {}
     n_batches = 0
     
     # Update loss weights if scheduler provided
@@ -225,7 +222,15 @@ def train_epoch(
         
         # Forward pass
         optimizer.zero_grad()
-        state_pred = _forward_with_initial_state_if_needed(model, t, context, state_true)
+        model_out = _forward_with_initial_state_if_needed(model, t, context, state_true)
+
+        # Some models (e.g. Direction AN) return (state_pred, physics_residuals).
+        # For training we only need the state prediction here; residuals are
+        # computed again inside the loss. This keeps older models fully intact.
+        if isinstance(model_out, (tuple, list)):
+            state_pred = model_out[0]
+        else:
+            state_pred = model_out
 
         # Compute loss
         loss, loss_dict = loss_fn(state_pred, state_true, t, context=context)
@@ -238,10 +243,13 @@ def train_epoch(
         
         optimizer.step()
         
-        # Accumulate losses
+        # Accumulate losses - log ALL components from loss_dict
         total_loss += loss.item()
-        for key in loss_components:
-            value = loss_dict.get(key)
+        for key, value in loss_dict.items():
+            if key == "total":
+                continue  # Skip total, we compute it separately
+            if key not in loss_components:
+                loss_components[key] = 0.0
             if value is None:
                 continue
             if isinstance(value, torch.Tensor):
@@ -266,16 +274,9 @@ def validate(
     """Validate model."""
     model.eval()
     total_loss = 0.0
-    loss_components = {
-        "data": 0.0,
-        "physics": 0.0,
-        "boundary": 0.0,
-        "mass_residual": 0.0,
-        "vz_residual": 0.0,
-        "vxy_residual": 0.0,
-        "smooth_z": 0.0,
-        "smooth_vz": 0.0,
-    }
+    # Initialize loss_components dynamically from loss_dict keys
+    # We'll accumulate all keys that appear in loss_dict
+    loss_components = {}
     n_batches = 0
     
     for batch in val_loader:
@@ -286,12 +287,22 @@ def validate(
         if t.dim() == 2:
             t = t.unsqueeze(-1)
         
-        state_pred = _forward_with_initial_state_if_needed(model, t, context, state_true)
+        model_out = _forward_with_initial_state_if_needed(model, t, context, state_true)
+
+        if isinstance(model_out, (tuple, list)):
+            state_pred = model_out[0]
+        else:
+            state_pred = model_out
+
         loss, loss_dict = loss_fn(state_pred, state_true, t, context=context)
 
         total_loss += loss.item()
-        for key in loss_components:
-            value = loss_dict.get(key)
+        # Accumulate losses - log ALL components from loss_dict
+        for key, value in loss_dict.items():
+            if key == "total":
+                continue  # Skip total, we compute it separately
+            if key not in loss_components:
+                loss_components[key] = 0.0
             if value is None:
                 continue
             if isinstance(value, torch.Tensor):
@@ -459,6 +470,23 @@ def main():
             use_rotation_6d=bool(model_cfg.get("use_rotation_6d", True)),
             enforce_mass_monotonicity=bool(model_cfg.get("enforce_mass_monotonicity", False)),
         ).to(device)
+    elif model_type == "direction_an":
+        from src.models.direction_an_pinn import DirectionANPINN
+
+        model = DirectionANPINN(
+            context_dim=context_dim,
+            fourier_features=int(model_cfg.get("fourier_features", 8)),
+            stem_hidden_dim=int(model_cfg.get("stem_hidden_dim", 128)),
+            stem_layers=int(model_cfg.get("stem_layers", 4)),
+            activation=model_cfg.get("activation", "tanh"),
+            layer_norm=bool(model_cfg.get("layer_norm", True)),
+            translation_branch_dims=model_cfg.get("translation_branch_dims", [128, 128]),
+            rotation_branch_dims=model_cfg.get("rotation_branch_dims", [256, 256]),
+            mass_branch_dims=model_cfg.get("mass_branch_dims", [64]),
+            dropout=safe_float(model_cfg.get("dropout"), 0.0),
+            physics_params=physics_params,
+            physics_scales=scales,
+        ).to(device)
     elif model_type == "latent_ode":
         from src.models.latent_ode import RocketLatentODEPINN
         model = RocketLatentODEPINN(
@@ -613,6 +641,10 @@ def main():
         lambda_smooth_vz=safe_float(loss_cfg.get("lambda_smooth_vz"), 0.0),
         lambda_pos_vel=safe_float(loss_cfg.get("lambda_pos_vel"), 0.0),
         lambda_smooth_pos=safe_float(loss_cfg.get("lambda_smooth_pos"), 0.0),
+        lambda_zero_vxy=safe_float(loss_cfg.get("lambda_zero_vxy"), 0.0),
+        lambda_zero_axy=safe_float(loss_cfg.get("lambda_zero_axy"), 0.0),
+        lambda_hacc=safe_float(loss_cfg.get("lambda_hacc"), 0.0),
+        lambda_xy_zero=safe_float(loss_cfg.get("lambda_xy_zero"), 0.0),
     )
     
     # Create optimizer
@@ -648,11 +680,15 @@ def main():
         **scheduler_kwargs
     )
     
-    # Create callbacks
+    # Create callbacks with phase-aware early stopping
+    early_stopping_patience = int(train_cfg.get("early_stopping_patience", 10))
+    early_stopping_patience_phase2 = int(train_cfg.get("early_stopping_patience_phase2", early_stopping_patience))
     early_stopping = EarlyStopping(
-        patience=int(train_cfg.get("early_stopping_patience", 10)),
+        patience=early_stopping_patience,
         min_delta=safe_float(train_cfg.get("early_stopping_min_delta"), 0.0)
     )
+    # Phase 2 early stopping (will be created after phase_start is determined)
+    early_stopping_phase2 = None
     
     checkpoint_callback = CheckpointCallback(
         checkpoint_dir=str(checkpoints_dir),
@@ -674,14 +710,26 @@ def main():
             total_epochs=int(train_cfg.get("epochs", 100))
         )
 
+    # Get number of epochs (needed for phase schedule setup)
+    n_epochs = int(train_cfg.get("epochs", 100))
+    
     phase_schedule_cfg = loss_cfg.get("phase_schedule")
     soft_loss_scheduler = None
+    phase_start = None
     if phase_schedule_cfg and phase_schedule_cfg.get("enabled", False):
+        phase1_ratio = safe_float(phase_schedule_cfg.get("phase1_ratio"), 0.75)
+        phase_start = int(n_epochs * phase1_ratio)
         soft_loss_scheduler = SoftLossScheduler(
             loss_fn=loss_fn,
             schedule_cfg=phase_schedule_cfg,
-            total_epochs=int(train_cfg.get("epochs", 100)),
+            total_epochs=n_epochs,
         )
+        # Create Phase 2 early stopping if needed
+        if early_stopping_patience_phase2 > early_stopping_patience:
+            early_stopping_phase2 = EarlyStopping(
+                patience=early_stopping_patience_phase2,
+                min_delta=safe_float(train_cfg.get("early_stopping_min_delta"), 0.0)
+            )
     
     # Resume from checkpoint if specified
     start_epoch = 0
@@ -690,9 +738,32 @@ def main():
         print(f"Resumed from epoch {start_epoch}")
     
     # Training loop
-    n_epochs = int(train_cfg.get("epochs", 100))
     best_val_loss = float('inf')
+    best_val_metric = float('inf')  # Composite metric including D1.52 losses
     train_log = []
+    
+    def compute_composite_metric(val_losses: Dict[str, float]) -> float:
+        """
+        Compute composite validation metric that includes D1.52 losses.
+        This metric is used for early stopping and best checkpoint selection.
+        """
+        # Base metric: total loss
+        metric = val_losses.get("total", float('inf'))
+        
+        # Add D1.52 losses with weights (if present)
+        d152_weight = 1.0  # Weight for D1.52 losses in composite metric
+        d152_losses = [
+            val_losses.get("zero_vxy", 0.0),
+            val_losses.get("zero_axy", 0.0),
+            val_losses.get("hacc", 0.0),
+            val_losses.get("xy_zero", 0.0),
+        ]
+        d152_sum = sum(d152_losses)
+        if d152_sum > 0:
+            # Add D1.52 losses to metric (scaled by weight)
+            metric += d152_weight * d152_sum
+        
+        return metric
     
     for epoch in range(start_epoch, n_epochs):
         if soft_loss_scheduler is not None:
@@ -705,6 +776,9 @@ def main():
         # Validate
         val_losses = validate(model, val_loader, loss_fn, device)
         
+        # Compute composite metric for early stopping and best checkpoint
+        val_metric = compute_composite_metric(val_losses)
+        
         # Update scheduler
         if isinstance(scheduler, optim.lr_scheduler.ReduceLROnPlateau):
             scheduler.step(val_losses["total"])
@@ -716,30 +790,47 @@ def main():
             "epoch": epoch + 1,
             "train": train_losses,
             "val": val_losses,
+            "val_metric": val_metric,  # Include composite metric in log
             "lr": optimizer.param_groups[0]["lr"]
         }
         train_log.append(log_entry)
         
         print(f"Epoch {epoch+1}/{n_epochs}")
         print(f"  Train Loss: {train_losses['total']:.6f} "
-              f"(data: {train_losses['data']:.6f}, "
-              f"phys: {train_losses['physics']:.6f}, "
-              f"bc: {train_losses['boundary']:.6f})")
-        print(f"  Val Loss: {val_losses['total']:.6f}")
+              f"(data: {train_losses.get('data', 0):.6f}, "
+              f"phys: {train_losses.get('physics', 0):.6f}, "
+              f"bc: {train_losses.get('boundary', 0):.6f})")
+        # Print D1.52 losses if present
+        if 'zero_vxy' in train_losses:
+            print(f"    D1.52: zero_vxy={train_losses.get('zero_vxy', 0):.6e}, "
+                  f"zero_axy={train_losses.get('zero_axy', 0):.6e}, "
+                  f"hacc={train_losses.get('hacc', 0):.6e}, "
+                  f"xy_zero={train_losses.get('xy_zero', 0):.6e}")
+        print(f"  Val Loss: {val_losses['total']:.6f}, Val Metric: {val_metric:.6f}")
         print(f"  LR: {optimizer.param_groups[0]['lr']:.2e}")
         
-        # Save checkpoint
-        is_best = val_losses["total"] < best_val_loss
+        # Save checkpoint using composite metric
+        is_best = val_metric < best_val_metric
         if is_best:
             best_val_loss = val_losses["total"]
+            best_val_metric = val_metric
         
         checkpoint_callback.save(
-            model, optimizer, epoch, val_losses["total"], is_best
+            model, optimizer, epoch, val_metric, is_best  # Use composite metric
         )
         
-        # Early stopping
-        if early_stopping(val_losses["total"]):
-            print(f"Early stopping at epoch {epoch+1}")
+        # Early stopping - phase-aware
+        in_phase2 = phase_start is not None and epoch >= phase_start
+        if in_phase2 and early_stopping_phase2 is not None:
+            # Use Phase 2 early stopping (higher patience)
+            should_stop = early_stopping_phase2(val_metric)
+        else:
+            # Use Phase 1 early stopping
+            should_stop = early_stopping(val_metric)
+        
+        if should_stop:
+            phase_str = "Phase 2" if in_phase2 else "Phase 1"
+            print(f"Early stopping at epoch {epoch+1} ({phase_str})")
             break
     
     # Save training log
