@@ -240,6 +240,8 @@ class DirectionANPINN(nn.Module):
         t: torch.Tensor,
         context: torch.Tensor,
         control: Optional[torch.Tensor] = None,
+        T_mag: Optional[torch.Tensor] = None,
+        q_dyn: Optional[torch.Tensor] = None,
     ) -> Tuple[torch.Tensor, PhysicsResiduals]:
         """
         Full forward pass.

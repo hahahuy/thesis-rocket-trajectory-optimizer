@@ -169,6 +169,96 @@ Typical nominal values (small sounding rockets):
 
 ---
 
+## Physical Parameters Reference
+
+### Aerodynamic Parameters
+
+| Parameter | Symbol | Unit | Default Value | Description |
+|-----------|--------|------|---------------|-------------|
+| Drag coefficient | `Cd` | dimensionless | 0.3 | Drag coefficient |
+| Lift coefficient | `Cl` | dimensionless | 0.0 | Lift coefficient |
+| Reference area | `S_ref` | m² | 0.05 | Reference area for aerodynamic forces |
+| Reference length | `l_ref` | m | 1.2 | Reference length for moment calculations |
+| Lift curve slope | `CL_alpha` | 1/rad | 3.5 | Lift coefficient per unit angle of attack |
+| Pitch moment coefficient | `Cm_alpha` | 1/rad | -0.8 | Pitch moment coefficient per unit angle of attack |
+| Control surface authority | `C_delta` | 1/rad | 0.05 | Control surface effectiveness |
+| Maximum control surface deflection | `delta_limit` | rad | 0.1745 (~10°) | Maximum control surface deflection angle |
+
+**Source**: `src/physics/types.hpp`, `configs/phys.yaml`
+
+### Inertia Parameters
+
+| Parameter | Symbol | Unit | Default Value | Description |
+|-----------|--------|------|---------------|-------------|
+| Inertia tensor | `I_b` | kg⋅m² | Diagonal [1000, 1000, 100] | 3×3 inertia tensor in body frame |
+| Moment of inertia (X-axis) | `Ix` | kg⋅m² | 1000.0 | Principal moment of inertia about X-axis |
+| Moment of inertia (Y-axis) | `Iy` | kg⋅m² | 1000.0 | Principal moment of inertia about Y-axis |
+| Moment of inertia (Z-axis) | `Iz` | kg⋅m² | 100.0 | Principal moment of inertia about Z-axis |
+| Center of gravity offset | `r_cg` | m | [0.0, 0.0, 0.0] | CG offset from body origin |
+
+**Source**: `src/physics/types.hpp`, `configs/phys.yaml`
+
+### Propulsion Parameters
+
+| Parameter | Symbol | Unit | Default Value | Description |
+|-----------|--------|------|---------------|-------------|
+| Specific impulse | `Isp` | s | 300.0 | Specific impulse (efficiency measure) |
+| Standard gravity | `g0` | m/s² | 9.81 | Standard gravitational acceleration |
+
+**Source**: `src/physics/types.hpp`, `configs/phys.yaml`
+
+### Atmospheric Parameters
+
+| Parameter | Symbol | Unit | Default Value | Description |
+|-----------|--------|------|---------------|-------------|
+| Sea level density | `rho0` | kg/m³ | 1.225 | Atmospheric density at sea level |
+| Atmospheric scale height | `h_scale` or `H` | m | 8400.0 / 8500.0 | Exponential atmosphere scale height |
+
+**Source**: `src/physics/types.hpp`, `configs/phys.yaml`
+
+### Operational Limits
+
+| Parameter | Symbol | Unit | Default Value | Description |
+|-----------|--------|------|---------------|-------------|
+| Maximum thrust | `T_max` | N | 1,000,000 | Maximum allowable thrust |
+| Dry mass | `m_dry` | kg | 1000.0 | Minimum mass (after fuel depletion) |
+| Maximum dynamic pressure | `q_max` | Pa | 40,000 | Maximum allowable dynamic pressure |
+| Maximum angle of attack | `alpha_max` | rad | 0.1 | Maximum allowable angle of attack |
+| Maximum gimbal rate | `w_gimbal_max` | rad/s | 1.0 | Maximum gimbal angular velocity |
+| Maximum load factor | `n_max` | g | 5.0 | Maximum normal load factor |
+| Minimum altitude | `h_min` | m | 0.0 | Minimum allowable altitude |
+| Maximum velocity | `v_max` | m/s | 1000.0 | Maximum allowable velocity |
+
+**Source**: `configs/limits.yaml`
+
+### Control Parameters
+
+| Parameter | Symbol | Unit | Default Value | Description |
+|-----------|--------|------|---------------|-------------|
+| Thrust rate | `thrust_rate` | N/s | 1e6 | Maximum thrust change rate |
+| Gimbal rate | `gimbal_rate_rad` | rad/s | 1.0 | Maximum gimbal angular velocity |
+
+**Source**: `src/data/generator.py`
+
+### Wind Parameters
+
+| Parameter | Symbol | Unit | Default Value | Description |
+|-----------|--------|------|---------------|-------------|
+| Wind magnitude | `wind_mag` | m/s | 0.0 | Wind speed magnitude |
+| Wind direction | `wind_dir_rad` | rad | 0.0 | Wind direction angle (azimuth) |
+| Wind X-component | `wind_u` | m/s | 0.0 | Wind velocity in X direction (East) |
+| Wind Y-component | `wind_v` | m/s | 0.0 | Wind velocity in Y direction (North) |
+| Wind Z-component | `wind_w` | m/s | 0.0 | Wind velocity in Z direction (Up) |
+| Gust amplitude | `gust_amp` | m/s | 0.0 | Gust amplitude |
+| Gust frequency | `gust_freq` | Hz | 1.0 | Gust frequency |
+| Gust axis | `gust_axis` | - | "x" | Gust axis direction |
+| Gust phase | `gust_phase` | rad | 0.0 | Gust phase offset |
+| Wind type | `wind_type` | - | "constant" | Wind model type: "zero", "constant", or "gust" |
+
+**Source**: `src/data/generator.py`, `src/physics/atmosphere.hpp`
+
+---
+
 ## Lessons Learned
 
 1) Strong typing + Eigen conversions greatly reduce integration errors  

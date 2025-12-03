@@ -639,6 +639,8 @@ def evaluate_model(
                 t = t.unsqueeze(-1)
             
             state_pred = _forward_with_initial_state_if_needed(model, t, context, state_true)
+            if isinstance(state_pred, (tuple, list)):
+                state_pred = state_pred[0]
             if hasattr(model, "get_debug_stats"):
                 stats = model.get_debug_stats()
                 if stats:

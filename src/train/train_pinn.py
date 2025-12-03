@@ -8,7 +8,7 @@ import math
 import re
 from datetime import datetime
 from pathlib import Path
-from typing import Dict, Optional
+from typing import Dict, Optional, Tuple
 
 import numpy as np
 import torch
@@ -26,6 +26,7 @@ from src.train.callbacks import (
 )
 from src.train.losses import PINNLoss
 from src.utils.loaders import create_dataloaders
+from src.utils.loaders_v2 import create_dataloaders_v2
 from src.utils.reproducibility import set_seed
 
 
@@ -58,11 +59,28 @@ def _forward_with_initial_state_if_needed(
     t: torch.Tensor,
     context: torch.Tensor,
     state_true: torch.Tensor,
+    T_mag: Optional[torch.Tensor] = None,
+    q_dyn: Optional[torch.Tensor] = None,
 ) -> torch.Tensor:
+    """
+    Forward pass helper that handles initial state and v2 features.
+    
+    Models that support v2 features (T_mag, q_dyn) should accept them as
+    optional keyword arguments. V1 models will ignore them.
+    """
     if _requires_initial_state(model):
         initial_state = state_true[:, 0, :]
-        return model(t, context, initial_state)
-    return model(t, context)
+        # Try v2 signature first, fallback to v1
+        try:
+            return model(t, context, initial_state, T_mag=T_mag, q_dyn=q_dyn)
+        except TypeError:
+            return model(t, context, initial_state)
+    
+    # Try v2 signature first, fallback to v1
+    try:
+        return model(t, context, T_mag=T_mag, q_dyn=q_dyn)
+    except TypeError:
+        return model(t, context)
 
 
 def _sanitize_experiment_desc(description: str) -> str:
@@ -216,13 +234,24 @@ def train_epoch(
         context = batch["context"].to(device)  # [batch, context_dim]
         state_true = batch["state"].to(device)  # [batch, N, 14]
         
+        # V2 features (optional)
+        T_mag = batch.get("T_mag", None)
+        q_dyn = batch.get("q_dyn", None)
+        if T_mag is not None:
+            T_mag = T_mag.to(device)
+        if q_dyn is not None:
+            q_dyn = q_dyn.to(device)
+        
         # Ensure t has correct shape [batch, N, 1]
         if t.dim() == 2:
             t = t.unsqueeze(-1)
         
         # Forward pass
         optimizer.zero_grad()
-        model_out = _forward_with_initial_state_if_needed(model, t, context, state_true)
+        # Pass T_mag and q_dyn if available (models that support v2 will use them)
+        model_out = _forward_with_initial_state_if_needed(
+            model, t, context, state_true, T_mag=T_mag, q_dyn=q_dyn
+        )
 
         # Some models (e.g. Direction AN) return (state_pred, physics_residuals).
         # For training we only need the state prediction here; residuals are
@@ -284,10 +313,20 @@ def validate(
         context = batch["context"].to(device)
         state_true = batch["state"].to(device)
         
+        # V2 features (optional)
+        T_mag = batch.get("T_mag", None)
+        q_dyn = batch.get("q_dyn", None)
+        if T_mag is not None:
+            T_mag = T_mag.to(device)
+        if q_dyn is not None:
+            q_dyn = q_dyn.to(device)
+        
         if t.dim() == 2:
             t = t.unsqueeze(-1)
         
-        model_out = _forward_with_initial_state_if_needed(model, t, context, state_true)
+        model_out = _forward_with_initial_state_if_needed(
+            model, t, context, state_true, T_mag=T_mag, q_dyn=q_dyn
+        )
 
         if isinstance(model_out, (tuple, list)):
             state_pred = model_out[0]
@@ -390,19 +429,30 @@ def main():
     
     scales = scales_config.get("scales", {})
     
-    # Create dataloaders
+    # Create dataloaders (v1 or v2 based on config)
     batch_size = int(train_cfg.get("batch_size", 8))
     num_workers = int(train_cfg.get("num_workers", 0))
     time_subsample = train_cfg.get("time_subsample")
     if time_subsample is not None:
         time_subsample = int(time_subsample)
     
-    train_loader, val_loader, test_loader = create_dataloaders(
-        data_dir=args.data_dir,
-        batch_size=batch_size,
-        num_workers=num_workers,
-        time_subsample=time_subsample
-    )
+    # Check if v2 dataloader is requested
+    use_v2_dataloader = train_cfg.get("use_v2_dataloader", False)
+    
+    if use_v2_dataloader:
+        train_loader, val_loader, test_loader = create_dataloaders_v2(
+            data_dir=args.data_dir,
+            batch_size=batch_size,
+            num_workers=num_workers,
+            time_subsample=time_subsample
+        )
+    else:
+        train_loader, val_loader, test_loader = create_dataloaders(
+            data_dir=args.data_dir,
+            batch_size=batch_size,
+            num_workers=num_workers,
+            time_subsample=time_subsample
+        )
     
     # Get context dimension from dataset
     context_dim = train_loader.dataset.context_dim

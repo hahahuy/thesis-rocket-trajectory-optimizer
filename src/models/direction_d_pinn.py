@@ -516,7 +516,13 @@ class DirectionDPINN_D15(nn.Module):
             aero_mag = torch.abs(cd) + torch.abs(cl_alpha) + torch.abs(cm_alpha)
             return (aero_mag.squeeze(-1) < aero_tolerance)
 
-    def forward(self, t: torch.Tensor, context: torch.Tensor) -> torch.Tensor:
+    def forward(
+        self, 
+        t: torch.Tensor, 
+        context: torch.Tensor,
+        T_mag: Optional[torch.Tensor] = None,
+        q_dyn: Optional[torch.Tensor] = None,
+    ) -> torch.Tensor:
         t, context, was_unbatched = self._ensure_batched(t, context)
         batch_size, N, _ = t.shape
 

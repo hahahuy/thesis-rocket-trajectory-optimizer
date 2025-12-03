@@ -45,7 +45,7 @@ def _forward_with_initial_state_if_needed(model, t, context, state_true):
     return model(t, context)
 
 
-def create_model(model_cfg, context_dim):
+def create_model(model_cfg, context_dim, physics_params=None, physics_scales=None):
     model_type = model_cfg.get("type", "pinn").lower()
 
     if model_type == "pinn":
@@ -110,6 +110,24 @@ def create_model(model_cfg, context_dim):
             dropout=safe_float(model_cfg.get("dropout"), 0.0),
             use_rotation_6d=bool(model_cfg.get("use_rotation_6d", True)),
             enforce_mass_monotonicity=bool(model_cfg.get("enforce_mass_monotonicity", False)),
+        )
+
+    if model_type == "direction_an":
+        from src.models.direction_an_pinn import DirectionANPINN
+
+        return DirectionANPINN(
+            context_dim=context_dim,
+            fourier_features=safe_int(model_cfg.get("fourier_features", 8)),
+            stem_hidden_dim=safe_int(model_cfg.get("stem_hidden_dim", 128)),
+            stem_layers=safe_int(model_cfg.get("stem_layers", 4)),
+            activation=model_cfg.get("activation", "tanh"),
+            layer_norm=bool(model_cfg.get("layer_norm", True)),
+            translation_branch_dims=model_cfg.get("translation_branch_dims", [128, 128]),
+            rotation_branch_dims=model_cfg.get("rotation_branch_dims", [256, 256]),
+            mass_branch_dims=model_cfg.get("mass_branch_dims", [64]),
+            dropout=safe_float(model_cfg.get("dropout"), 0.0),
+            physics_params=physics_params,
+            physics_scales=physics_scales,
         )
 
     if model_type == "residual":
@@ -273,7 +291,7 @@ def create_model(model_cfg, context_dim):
 
     raise ValueError(
         f"Unsupported model type '{model_type}'. "
-        "Supported: pinn, residual, latent_ode, sequence, hybrid, hybrid_c1, hybrid_c2, hybrid_c3, direction_d, direction_d1, direction_d15."
+        "Supported: pinn, residual, latent_ode, sequence, hybrid, hybrid_c1, hybrid_c2, hybrid_c3, direction_d, direction_d1, direction_d15, direction_an."
     )
 
 
@@ -394,6 +412,31 @@ def main():
             f"F={scales.F}, W={scales.W}"
         )
 
+        physics_params = {}
+        physics_config_path = config.get("physics_config", "configs/phys.yaml")
+        if physics_config_path:
+            physics_config_path = Path(physics_config_path)
+            if not physics_config_path.is_file():
+                physics_config_path = Path.cwd() / physics_config_path
+            if physics_config_path.is_file():
+                with open(physics_config_path, "r") as f:
+                    phys_config = yaml.safe_load(f) or {}
+                for section in ("aerodynamics", "propulsion", "atmosphere"):
+                    physics_params.update(phys_config.get(section, {}))
+                if "inertia" in phys_config and "I_b" in phys_config["inertia"]:
+                    I_b = phys_config["inertia"]["I_b"]
+                    if isinstance(I_b, list) and len(I_b) >= 9:
+                        physics_params["I_b"] = [I_b[0], I_b[4], I_b[8]]
+
+        physics_scales = {
+            "L": scales.L,
+            "V": scales.V,
+            "T": scales.T,
+            "M": scales.M,
+            "F": scales.F,
+            "W": scales.W,
+        }
+
         data_dir = Path(args.data_dir)
         if not data_dir.exists():
             raise FileNotFoundError(f"Data directory not found: {data_dir}")
@@ -410,7 +453,12 @@ def main():
         print(f"Context dimension: {context_dim}")
         print(f"Test dataset size: {len(test_loader.dataset)}")
 
-        model = create_model(model_cfg, context_dim)
+        model = create_model(
+            model_cfg,
+            context_dim,
+            physics_params=physics_params,
+            physics_scales=physics_scales,
+        )
         model.load_state_dict(model_state)
 
         device = resolve_device(args.device)
@@ -451,6 +499,8 @@ def main():
                         state_pred = _forward_with_initial_state_if_needed(
                             model, t, context, state_true
                         )
+                        if isinstance(state_pred, (tuple, list)):
+                            state_pred = state_pred[0]
 
                         t_np = t[0].cpu().detach().squeeze(-1).numpy()
                         pred_np = state_pred[0].cpu().detach().numpy()

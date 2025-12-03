@@ -405,6 +405,135 @@ Compared to C1 baseline:
 
 ---
 
+## [2025-XX-XX] Direction C3 – Enhanced Hybrid PINN with RMSE Reduction Solutions
+
+### Added Files
+- **`src/models/hybrid_pinn.py`**
+  - Class `RocketHybridPINNC3`: Enhanced C2 with 6 architectural solutions
+- **`src/models/branches.py`**
+  - `MonotonicMassBranch`: Structural mass monotonicity (Solution 3)
+  - `RotationBranchMinimal`: Quaternion minimal representation (Solution 2)
+  - `PhysicsAwareTranslationBranch`: Explicit physics computation (Solution 1)
+- **`src/models/latent_ode.py`**
+  - `LatentODEBlockRK4`: Higher-order ODE integration (Solution 4)
+- **`src/models/coordination.py`**
+  - `CoordinatedBranches`: Cross-branch coordination (Solution 5)
+  - `AerodynamicCouplingModule`: Aerodynamic coupling module
+- **`src/models/physics_layers.py`**
+  - `PhysicsComputationLayer`: Explicit density and drag computation
+- **`src/models/z0_encoder.py`**
+  - `EnhancedZ0Derivation`: Hybrid physics+data z0 initialization (Solution 6)
+  - `PhysicsInformedZ0Encoder`: Physics-based z0 encoder
+
+### Modified Files
+- **`configs/model_hybrid_c3.yaml`** – C3 model configuration
+- **`configs/train_hybrid_c3.yaml`** – C3 training recipe
+- **`src/train/train_pinn.py`** – adds `model_type: hybrid_c3`
+- **`run_evaluation.py`** – evaluation support for `hybrid_c3`
+
+### Architecture Details
+
+**Base**: Direction C2 (Shared Stem + Dedicated Branches)
+
+**Six Architectural Solutions**:
+
+1. **Solution 1: Physics-Informed Vertical Dynamics Branch**
+   - Explicit altitude→density→drag computation
+   - `PhysicsComputationLayer` computes `rho(z) = rho0 * exp(-z/H)`
+   - Drag force: `F_drag = 0.5 * rho * |v|² * Cd * S`
+   - Corrects vertical velocity: `vz_corrected = vz - drag_z / m`
+
+2. **Solution 2: Quaternion Minimal Representation**
+   - Rotation vector (3D) → quaternion conversion (always unit norm)
+   - Eliminates normalization gradient issues
+   - `rotation_vector_to_quaternion()`: axis-angle → quaternion
+
+3. **Solution 3: Structural Mass Monotonicity**
+   - `mass_delta = -ReLU(mass_delta_raw)` (always ≤ 0)
+   - `mass = cumsum(mass_delta) + m0` (always decreasing)
+   - Eliminates 4.2% mass violations from C2
+
+4. **Solution 4: Higher-Order ODE Integration (RK4)**
+   - Replaces Euler (O(dt)) with RK4 (O(dt⁴))
+   - ~1000x smaller integration error per step
+   - 4 function evaluations per step vs Euler's 1
+
+5. **Solution 5: Cross-Branch Coordination**
+   - `AerodynamicCouplingModule` computes drag corrections
+   - Translation branch receives rotation and mass information
+   - Explicit aerodynamic coupling between branches
+
+6. **Solution 6: Enhanced z0 Initialization**
+   - Hybrid approach: 30% physics-informed + 70% data-driven
+   - Full sequence mean + window Transformer
+   - Better initialization reduces error propagation
+
+### Key Features
+- **Structural Constraints**: Mass monotonicity and quaternion unit norm guaranteed by architecture
+- **Explicit Physics**: Density and drag computed directly, not learned from data
+- **Higher-Order Integration**: RK4 reduces integration error accumulation
+- **Cross-Branch Coordination**: Aerodynamic coupling between translation and rotation
+- **Better Initialization**: Hybrid physics+data z0 reduces error propagation
+
+### Configuration
+
+```yaml
+model:
+  type: hybrid_c3
+  # Same as C2 base parameters
+  latent_dim: 64
+  fourier_features: 8
+  shared_stem_hidden_dim: 128
+  # ... (other C2 parameters)
+  
+  # C3-specific parameters
+  z0_blend_alpha: 0.3  # Weight for physics-informed z0
+  use_rk4: true        # Use RK4 instead of Euler
+  use_physics_aware_translation: true
+  use_coordinated_branches: true
+```
+
+### Rationale
+
+**C2 Baseline Performance (exp3)**:
+- Total RMSE: 0.96
+- Rotation RMSE: 0.38 (3.5x worse than exp2)
+- Mass violations: 4.2% (physically impossible)
+- Vertical dynamics errors: z: 0.91-1.10, vz: 2.98-3.45
+
+**Failed Approach (exp4 - Loss Weighting)**:
+- Total RMSE: 1.005 (worse than C2!)
+- Mass violations: 4.2% (not fixed)
+- **Conclusion**: Loss weighting doesn't fix root causes
+
+**C3 Solution**: Architectural improvements that address root causes structurally, not through penalties.
+
+### Expected Performance
+
+| Component | C2 (exp3) | C3 (Expected) | Improvement | Solution(s) |
+|-----------|-----------|---------------|-------------|-------------|
+| **Total RMSE** | 0.96 | **0.60-0.75** | 25-40% | All solutions |
+| **Translation RMSE** | 1.41 | **0.90-1.20** | 15-30% | Solutions 1, 4, 5 |
+| **Rotation RMSE** | 0.38 | **0.15-0.25** | 35-60% | Solutions 2, 5 |
+| **Mass RMSE** | 0.19 | **0.10-0.12** | 20-30% | Solution 3 |
+| **Vertical (z)** | 0.91-1.10 | **0.60-0.80** | 20-30% | Solutions 1, 4 |
+| **Vertical (vz)** | 2.98-3.45 | **1.80-2.40** | 30-40% | Solutions 1, 4 |
+| **Mass Violations** | 4.2% | **0%** | 100% fix | Solution 3 |
+| **Quaternion Norm** | 1.08 | **1.0** | 100% fix | Solution 2 |
+
+### Implementation Status
+- ⚠️ **Planned**: C3 architecture designed but not yet implemented
+- 📋 **Reference**: See `docs/expANAL_SOLS.md` for detailed implementation guide
+- 🔄 **Next Steps**: Implement solutions in phases (high → medium → low priority)
+
+### Notes
+- C3 addresses root causes architecturally, not through loss penalties
+- All solutions are backward compatible with C2 base architecture
+- Implementation can be done incrementally (solutions can be added one at a time)
+- Expected to achieve 25-40% RMSE improvement over C2 baseline
+
+---
+
 ## [2025-11-24] Direction D – Dependency-Aware Backbone
 
 ### Added Files

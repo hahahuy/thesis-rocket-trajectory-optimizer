@@ -1,0 +1,65 @@
+model:
+  type: direction_an
+  fourier_features: 8
+  stem_hidden_dim: 128
+  stem_layers: 4
+  activation: tanh
+  layer_norm: true
+  translation_branch_dims: [128, 128]
+  rotation_branch_dims: [256, 256]
+  mass_branch_dims: [64]
+  dropout: 0.0
+
+train:
+  experiment_name: direction_an_v2
+  batch_size: 8
+  num_workers: 0
+  epochs: 160
+  learning_rate: 1e-3
+  weight_decay: 1e-5
+  time_subsample: null
+  early_stopping_patience: 25
+  early_stopping_patience_phase2: 40
+  early_stopping_min_delta: 0.0
+  # Enable v2 dataloader (loads T_mag and q_dyn)
+  use_v2_dataloader: true
+  scheduler:
+    type: cosine
+    kwargs:
+      T_max: 160
+      eta_min: 1e-6
+
+loss:
+  lambda_data: 1.0
+  lambda_phys: 0.1
+  lambda_phys_final: 1.0
+  lambda_bc: 1.0
+  lambda_translation: 1.0
+  lambda_rotation: 1.0
+  lambda_mass: 1.0
+  # Soft physics residuals / regularization - reduced weights for v2
+  lambda_mass_residual: 0.02
+  lambda_vz_residual: 0.02
+  lambda_vxy_residual: 0.005
+  lambda_smooth_z: 5.0e-5
+  lambda_smooth_vz: 1.0e-5
+  lambda_pos_vel: 0.5
+  lambda_smooth_pos: 0.0
+  # Horizontal motion suppression - disabled for v2
+  lambda_zero_vxy: 0.0
+  lambda_zero_axy: 0.0
+  lambda_hacc: 0.0
+  lambda_xy_zero: 0.0
+  lambda_quat_norm: 0.0
+  lambda_mass_flow: 0.0
+  homotopy_schedule: fixed
+  component_weights:
+    m: 4.0
+  phase_schedule:
+    enabled: true
+    phase1_ratio: 0.55
+    ramp: cosine
+
+physics_config: configs/phys.yaml
+scales_config: configs/scales.yaml
+

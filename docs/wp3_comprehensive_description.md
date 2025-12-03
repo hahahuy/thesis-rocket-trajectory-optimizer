@@ -75,6 +75,68 @@ Produce clean, scalable datasets of reference trajectories by:
 - `[T, uTx, uTy, uTz]` (4 variables)
 - Thrust direction: `||uT|| = 1` enforced
 
+### Data Generator Parameters
+
+#### Sampled Parameters (with ranges)
+
+These parameters are randomly sampled during data generation using Latin Hypercube Sampling (LHS) or Sobol sequences.
+
+| Parameter | Symbol | Range | Unit | Description |
+|-----------|--------|-------|------|-------------|
+| Initial mass | `m0` | [45.0, 65.0] | kg | Initial rocket mass (wet mass) |
+| Specific impulse | `Isp` | [220.0, 280.0] | s | Propellant efficiency |
+| Drag coefficient | `Cd` | [0.25, 0.45] | - | Drag coefficient |
+| Lift curve slope | `CL_alpha` | [2.5, 4.5] | 1/rad | Lift coefficient per unit angle of attack |
+| Pitch moment coefficient | `Cm_alpha` | [-1.2, -0.4] | 1/rad | Pitch moment coefficient per unit angle of attack |
+| Maximum thrust | `Tmax` | [3000.0, 5000.0] | N | Maximum available thrust |
+| Wind magnitude | `wind_mag` | [0.0, 15.0] | m/s | Wind speed magnitude |
+
+**Source**: `configs/dataset.yaml`
+
+#### Fixed/Default Parameters
+
+These parameters are held constant or use default values during data generation.
+
+| Parameter | Symbol | Default Value | Unit | Description |
+|-----------|--------|---------------|------|-------------|
+| Reference area | `S` or `S_ref` | 0.05 | m² | Reference area for aerodynamic forces |
+| Reference length | `l_ref` | 1.2 | m | Reference length for moments |
+| Moment of inertia (X) | `Ix` | 10.0 | kg⋅m² | Principal moment of inertia about X-axis |
+| Moment of inertia (Y) | `Iy` | 10.0 | kg⋅m² | Principal moment of inertia about Y-axis |
+| Moment of inertia (Z) | `Iz` | 1.0 | kg⋅m² | Principal moment of inertia about Z-axis |
+| Sea level density | `rho0` | 1.225 | kg/m³ | Atmospheric density at sea level |
+| Atmospheric scale height | `H` | 8500.0 | m | Exponential atmosphere scale height |
+| Dry mass | `mdry` | 35.0 | kg | Minimum mass after fuel depletion |
+| Maximum gimbal angle | `gimbal_max_rad` | 0.1745 | rad | Maximum gimbal deflection (~10°) |
+| Thrust rate | `thrust_rate` | 1e6 | N/s | Maximum thrust change rate |
+| Gimbal rate | `gimbal_rate_rad` | 1.0 | rad/s | Maximum gimbal angular velocity |
+| Wind direction | `wind_dir_rad` | 0.0 | rad | Wind direction angle (default: from North) |
+| Wind type | `wind_type` | "constant" | - | Wind model type |
+
+**Source**: `src/data/generator.py`
+
+#### Constraints
+
+| Parameter | Symbol | Value | Unit | Description |
+|-----------|--------|-------|------|-------------|
+| Maximum dynamic pressure | `qmax` | 40,000 | Pa | Maximum allowable dynamic pressure |
+| Maximum load factor | `nmax` | 5.0 | g | Maximum normal load factor |
+
+**Source**: `configs/dataset.yaml`
+
+#### Data Generation Settings
+
+| Parameter | Symbol | Value | Description |
+|-----------|--------|-------|-------------|
+| Number of training cases | `n_train` | 120 | Training dataset size |
+| Number of validation cases | `n_val` | 20 | Validation dataset size |
+| Number of test cases | `n_test` | 20 | Test dataset size |
+| Sampling method | `sampler` | "lhs" | Sampling method: "lhs", "sobol", or "grid" |
+| Time horizon | `time_horizon_s` | 30.0 | s | Trajectory duration |
+| Grid frequency | `grid_hz` | 50 | Hz | Time grid resolution |
+
+**Source**: `configs/dataset.yaml`
+
 ### Entrypoint Contracts
 
 **WP2 OCP Solver**:
