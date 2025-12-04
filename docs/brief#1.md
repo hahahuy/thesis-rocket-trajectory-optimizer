@@ -450,18 +450,19 @@ L_total = λ_data·L_data + λ_phys·L_phys + λ_bc·L_bc + L_soft_physics
 **Architecture Overview:**
 
 ```mermaid
-flowchart LR
+flowchart TB
+
     subgraph Inputs
         T[Time t]
-        C[Context (m0, Isp, Cd, CL_alpha, Cm_alpha, Tmax, wind_mag)]
-        TM[T_mag (v2)]
-        QD[q_dyn (v2)]
+        C[Context <br> m0 Isp Cd CL_alpha Cm_alpha Tmax wind_mag]
+        TM[T_mag v2]
+        QD[q_dyn v2]
     end
 
     subgraph InputBlockV2
-        TE[Time Embedding\n(Fourier)]
-        CE[Context Encoder\nMLP]
-        EE[Extra Features\nMLP (T_mag, q_dyn)]
+        TE[Time Embedding Fourier]
+        CE[Context Encoder MLP]
+        EE[Extra Features MLP <br> T_mag q_dyn]
     end
 
     subgraph Backbone
@@ -472,13 +473,13 @@ flowchart LR
     end
 
     subgraph Heads
-        G3[Head G3:\nMass m]
-        G2[Head G2:\nAttitude q,\nAngular vel w]
-        G1[Head G1:\nPosition x,\nVelocity v]
+        G3[Head G3 <br> Mass m]
+        G2[Head G2 <br> Attitude q Angular vel w]
+        G1[Head G1 <br> Position x Velocity v]
     end
 
     subgraph Output
-        S[State Trajectory\n(x, y, z, vx, vy, vz,\nq0..q3, wx, wy, wz, m)]
+        S[State Trajectory <br> x y z vx vy vz q0..q3 wx wy wz m]
     end
 
     %% Input fusion
@@ -500,7 +501,7 @@ flowchart LR
     B4 --> G1
 
     G3 -->|m| G2
-    G2 -->|q, w| G1
+    G2 -->|q w| G1
 
     %% Final state assembly
     G1 --> S
