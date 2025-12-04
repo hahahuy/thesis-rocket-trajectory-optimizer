@@ -6,18 +6,13 @@
    - 1.1 [Dataset Structure](#11-dataset-structure)
    - 1.2 [Data Pipeline: Raw → Processed v1 → Processed v2](#12-data-pipeline-raw--processed-v1--processed-v2)
      - 1.2.1 [Original/Raw Data](#121-originalraw-data)
-     - 1.2.2 [Processed v1 Data](#122-processed-v1-data)
-     - 1.2.3 [Processed v2 Data](#123-processed-v2-data)
+     - 1.2.2 [Processed v1/v2 Data](#122-processed-v1v2-data)
    - 1.3 [Exploratory Data Analysis (EDA)](#13-exploratory-data-analysis-eda)
      - 1.3.1 [State Variable Statistics](#131-state-variable-statistics)
      - 1.3.2 [Trajectory Characteristics](#132-trajectory-characteristics)
      - 1.3.3 [Context Parameter Analysis](#133-context-parameter-analysis)
      - 1.3.4 [Data Quality Observations](#134-data-quality-observations)
-   - 1.4 [Context Variables (Model Input)](#14-context-variables-model-input)
-   - 1.5 [State Variables (Model Output)](#15-state-variables-model-output)
-   - 1.6 [Additional Input Features (v2 Data)](#16-additional-input-features-v2-data)
-   - 1.7 [Most Important Variable to Predict](#17-most-important-variable-to-predict)
-   - 1.8 [Model Input and Output](#18-model-input-and-output)
+   - 1.4 [Model Inputs and Outputs](#14-model-inputs-and-outputs)
 
 2. [Loss Function](#2-loss-function)
    - 2.1 [Total Loss Structure](#21-total-loss-structure)
@@ -141,36 +136,49 @@ Each case represents a unique combination of the 7 varied physical parameters, r
 - Different aerodynamic effects (based on Cd, CL_alpha, Cm_alpha)
 - Different wind effects (based on wind_mag)
 
-#### 1.2.2 Processed v1 Data
+#### 1.2.2 Processed v1/v2 Data
 
-**Location**: `data/processed/`
+**Locations**: 
+- v1: `data/processed/`
+- v2: `data/processed_v2/`
 
-**Format**: Consolidated HDF5 files per split: `train.h5`, `val.h5`, `test.h5`
+**Format (common)**: Consolidated HDF5 files per split: `train.h5`, `val.h5`, `test.h5`
 
-**Complete Schema**:
+**v1/v2 Base Schema**:
 ```
 train.h5 (or val.h5, test.h5)
 ├── inputs/
 │   ├── t: [n_cases, N]         # Time grid (nondimensional, float64)
-│   │   Shape: (120, 1501) for train, (20, 1501) for val/test
-│   │   Normalized: t_nd = t / T where T = 31.62 s
 │   └── context: [n_cases, context_dim]  # Context parameters (normalized, float64)
-│       Shape: (120, 7) for train, (20, 7) for val/test
-│       Format: [m0, Isp, Cd, CL_alpha, Cm_alpha, Tmax, wind_mag]
-│       Normalized using physics-aware scaling
 ├── targets/
 │   └── state: [n_cases, N, 14]  # State trajectories (nondimensional, float64)
-│       Shape: (120, 1501, 14) for train, (20, 1501, 14) for val/test
-│       Format: [x, y, z, vx, vy, vz, q0, q1, q2, q3, wx, wy, wz, m]
-│       Normalized using reference scales (L, V, T, M, W)
 └── meta/
     ├── scales: JSON string      # Reference scales dictionary
-    │   Contains: {"L": 10000.0, "V": 313.0, "T": 31.62, "M": 50.0, "F": 490.0, "W": 0.0316}
     └── context_fields: JSON array  # Context field names
-        Contains: ["m0", "Isp", "Cd", "CL_alpha", "Cm_alpha", "Tmax", "wind_mag"]
 ```
 
-**Key Transformations**:
+**Concrete Shapes (Direction D1.5.4 dataset)**:
+- `t`: 
+  - Train: `[120, 1501]`
+  - Val/Test: `[20, 1501]`
+  - Normalization: `t_nd = t / T` with `T = 31.62 s`
+-- `context`:
+  - Train: `[120, 7]`
+  - Val/Test: `[20, 7]`
+  - Fields: `[m0, Isp, Cd, CL_alpha, Cm_alpha, Tmax, wind_mag]`
+  - **How created**:
+    - For each raw case, the generator stores dimensional parameters in `meta/params_used` (JSON dict).
+    - Preprocessing (`process_raw_to_splits` in `src/data/preprocess.py`) scans all raw cases to find which keys actually exist and builds a canonical list from `CONTEXT_FIELDS`.
+    - It then calls `build_context_vector(params_used, scales, fields=canonical_fields)` to:
+      - Normalize each scalar with physics-aware rules (e.g. `m0 / M`, `Tmax / F`, `Isp / 250`, `Cd` as-is, `wind_mag / V`).
+      - Pack them in a fixed order into a length‑7 vector.
+    - All per‑case vectors are stacked into `inputs/context`, and the field names are saved as `meta/context_fields` so v1 and v2 agree on the ordering.
+- `state`:
+  - Train: `[120, 1501, 14]`
+  - Val/Test: `[20, 1501, 14]`
+  - Format: `[x, y, z, vx, vy, vz, q0, q1, q2, q3, wx, wy, wz, m]`
+
+**Key Transformations (v1 and v2 share the same base preprocessing)**:
 - **Nondimensionalization**: All state variables are normalized using physics-aware reference scales:
   - Length scale `L` (typically 10,000 m)
   - Velocity scale `V` (typically 313 m/s)
@@ -182,52 +190,12 @@ train.h5 (or val.h5, test.h5)
 - **Consolidation**: Individual case files consolidated into train/val/test splits
 - **Context Extraction**: Physical parameters extracted from metadata and assembled into context vectors
 
-**Features**:
+**Features (v1/v2)**:
 - Time grid: `[n_cases, N]` where `N = 1501`
 - Context vector: `[n_cases, 7]` (m0, Isp, Cd, CL_alpha, Cm_alpha, Tmax, wind_mag)
 - State trajectories: `[n_cases, N, 14]` (nondimensional)
 
-#### 1.2.3 Processed v2 Data
-
-**Location**: `data/processed_v2/`
-
-**Format**: Extended v1 format with additional physics features
-
-**Complete Schema**:
-```
-train.h5 (or val.h5, test.h5)
-├── inputs/
-│   ├── t: [n_cases, N]         # Time grid (nondimensional, float64) [v1]
-│   │   Shape: (120, 1501) for train, (20, 1501) for val/test
-│   │   Normalized: t_nd = t / T where T = 31.62 s
-│   ├── context: [n_cases, context_dim]  # Context parameters (normalized, float64) [v1]
-│   │   Shape: (120, 7) for train, (20, 7) for val/test
-│   │   Format: [m0, Isp, Cd, CL_alpha, Cm_alpha, Tmax, wind_mag]
-│   │   Normalized using physics-aware scaling
-│   ├── T_mag: [n_cases, N]     # Thrust magnitude (nondimensional, float64) [v2 NEW]
-│   │   Shape: (120, 1501) for train, (20, 1501) for val/test
-│   │   Normalized: T_mag_nd = T_mag / F where F = 490.0 N
-│   │   Computed from: control[:, 0] (thrust component)
-│   └── q_dyn: [n_cases, N]     # Dynamic pressure (nondimensional, float64) [v2 NEW]
-│       Shape: (120, 1501) for train, (20, 1501) for val/test
-│       Normalized: q_dyn_nd = q_dyn / (F / L²) where F = 490.0 N, L = 10000.0 m
-│       Computed from: q_dyn = 0.5 * ρ(z) * |v|²
-│       Density: ρ(z) = ρ₀ * exp(-z / h_scale) with ρ₀ = 1.225 kg/m³, h_scale = 8400.0 m
-│       Speed: |v| = sqrt(vx² + vy² + vz²)
-├── targets/
-│   └── state: [n_cases, N, 14]  # State trajectories (nondimensional, float64) [v1]
-│       Shape: (120, 1501, 14) for train, (20, 1501, 14) for val/test
-│       Format: [x, y, z, vx, vy, vz, q0, q1, q2, q3, wx, wy, wz, m]
-│       Normalized using reference scales (L, V, T, M, W)
-└── meta/
-    ├── scales: JSON string      # Reference scales dictionary [v1]
-    │   Contains: {"L": 10000.0, "V": 313.0, "T": 31.62, "M": 50.0, "F": 490.0, "W": 0.0316}
-    ├── context_fields: JSON array  # Context field names [v1]
-    │   Contains: ["m0", "Isp", "Cd", "CL_alpha", "Cm_alpha", "Tmax", "wind_mag"]
-    └── version: "v2"            # Version marker (string) [v2 NEW]
-```
-
-**Key Additions**:
+**v2 Key Additions (on top of v1)**:
 - **T_mag (Thrust Magnitude)**:
   - **Computation**: Extracted from control vector `u[:, 0]` (thrust component)
   - **Units**: Nondimensionalized using `F` scale: `T_mag_nd = T_mag / scales.F`
@@ -242,9 +210,7 @@ train.h5 (or val.h5, test.h5)
   - **Shape**: `[n_cases, N]`
   - **Purpose**: Provides aerodynamic loading information directly to models
 
-**Backward Compatibility**: v2 is backward compatible with v1. All v1 functionality is preserved, and v2 adds optional features that models can use if supported.
-
-**Current Usage**: Direction D1.5.4 model uses v2 data format to leverage `T_mag` and `q_dyn` features via `InputBlockV2`.
+**Backward Compatibility**: v2 is backward compatible with v1. All v1 functionality is preserved, and v2 adds optional features that models can use if supported. Direction D1.5.4 uses v2 data to leverage `T_mag` and `q_dyn` features via `InputBlockV2`.
 
 ---
 
@@ -350,25 +316,26 @@ train.h5 (or val.h5, test.h5)
 
 ---
 
-### 1.4 Context Variables (Model Input)
+### 1.4 Model Inputs and Outputs
+
+#### Context Variables (Case-level Inputs)
 
 The model receives a **7-dimensional context vector** per case (constant across time):
 
-| Index | Variable | Symbol | Description | Varies From |
-|-------|----------|--------|-------------|--------------|
-| 0 | Initial Mass | `m0` | Initial rocket mass (kg) | Parameter space sampling |
-| 1 | Specific Impulse | `Isp` | Propellant efficiency (s) | Parameter space sampling |
-| 2 | Drag Coefficient | `Cd` | Drag coefficient (-) | Parameter space sampling |
-| 3 | Lift Curve Slope | `CL_alpha` | Lift coefficient per unit angle of attack (1/rad) | Parameter space sampling |
-| 4 | Pitch Moment Coefficient | `Cm_alpha` | Pitch moment coefficient per unit angle of attack (1/rad) | Parameter space sampling |
-| 5 | Maximum Thrust | `Tmax` | Maximum available thrust (N) | Parameter space sampling |
-| 6 | Wind Magnitude | `wind_mag` | Wind speed magnitude (m/s) | Parameter space sampling |
+| Index | Variable | Symbol | Description | Range |
+|-------|----------|--------|-------------|-------|
+| 0 | Initial Mass | `m0` | Initial rocket mass (kg) | `[45, 65]` |
+| 1 | Specific Impulse | `Isp` | Propellant efficiency (s) | `[220, 280]` |
+| 2 | Drag Coefficient | `Cd` | Drag coefficient (-) | `[0.25, 0.45]` |
+| 3 | Lift Curve Slope | `CL_alpha` | Lift coefficient per unit angle of attack (1/rad) | `[2.5, 4.5]` |
+| 4 | Pitch Moment Coefficient | `Cm_alpha` | Pitch moment coefficient per unit angle of attack (1/rad) | `[-1.2, -0.4]` |
+| 5 | Maximum Thrust | `Tmax` | Maximum available thrust (N) | `[3000, 5000]` |
+| 6 | Wind Magnitude | `wind_mag` | Wind speed magnitude (m/s) | `[0, 15]` |
 
-**Context Shape**: `[n_cases, 7]`
+- **Tensor Shape**: `[n_cases, 7]`
+- **Normalization**: Each field uses physics-aware scaling (mass by `M`, thrust by `F`, velocities by `V`, etc.).
 
-**Context Normalization**: All context parameters are normalized using physics-aware scaling before being fed to the model.
-
-### 1.5 State Variables (Model Output)
+#### State Variables (Trajectory Targets)
 
 The model predicts a **14-dimensional state vector** at each time step:
 
@@ -380,49 +347,31 @@ The model predicts a **14-dimensional state vector** at each time step:
 | 10-12 | Angular Velocity | `[wx, wy, wz]` | Angular velocity components (rad/s, nondimensional) |
 | 13 | Mass | `m` | Rocket mass (kg, nondimensional) |
 
-**State Shape**: `[n_cases, N, 14]` where `N = 1501`
+- **Tensor Shape**: `[n_cases, N, 14]` where `N = 1501`
+- **Normalization**: Positions by `L`, velocities by `V`, time derivatives by `T`, mass by `M`, angular rates by `W`.
 
-### 1.6 Additional Input Features (v2 Data)
-
-For the v2 dataset, two additional time-varying features are included:
+#### Additional Time-Series Features (v2-only)
 
 | Feature | Symbol | Description | Shape |
 |---------|--------|-------------|-------|
-| Thrust Magnitude | `T_mag` | Time-varying thrust magnitude (N, nondimensional) | `[n_cases, N]` |
-| Dynamic Pressure | `q_dyn` | Time-varying dynamic pressure (Pa, nondimensional) | `[n_cases, N]` |
+| Thrust Magnitude | `T_mag` | Time-varying thrust magnitude (nondimensional) | `[n_cases, N]` |
+| Dynamic Pressure | `q_dyn` | Time-varying dynamic pressure (nondimensional) | `[n_cases, N]` |
 
-These features are computed from the control trajectory and state:
-- `T_mag`: Extracted from control vector `u[:, 0]`
-- `q_dyn`: Computed as `q_dyn = 0.5 * ρ(z) * |v|²` where density follows exponential atmosphere model
+Computation:
+- `T_mag`: Extracted from control vector `u[:, 0]`, scaled by `F = 490 N`.
+- `q_dyn`: `0.5 * ρ(z) * |v|²`, scaled by `F / L²` (`ρ(z) = ρ₀ * exp(-z / h_scale)`).
 
-### 1.7 Most Important Variable to Predict
+**Why this matters (short explanation).** Altitude `z` and vertical velocity `vz` remain the critical targets because they directly encode mission success (reaching target apogee), safety (dynamic pressure), and performance metrics. Mass, quaternion, and angular velocity are still predicted to preserve coupled dynamics (mass → attitude → translation) even though they are less critical for evaluation.
 
-The **most critical variable** we are trying to predict is the **vertical position (altitude) `z`** and **vertical velocity `vz`**, as these directly determine:
+#### Batch Usage
 
-1. **Mission Success**: The rocket must reach the target altitude
-2. **Trajectory Safety**: Altitude determines atmospheric density, which affects aerodynamic forces
-3. **Performance Metrics**: Maximum altitude, time-to-apogee, and descent characteristics
+Direction D1.5.4 consumes the following tensors per batch:
+- `t`: `[batch, N, 1]`
+- `context`: `[batch, 7]`
+- `T_mag`: `[batch, N, 1]` (optional for v1 data, zeros if absent)
+- `q_dyn`: `[batch, N, 1]` (optional for v1 data)
 
-However, the model predicts the **entire 14-dimensional state** because:
-- **Coupled Dynamics**: Translation, rotation, and mass are physically coupled
-- **Physics Constraints**: The 6-DOF dynamics require all state components for accurate prediction
-- **Dependency Chain**: Mass → Attitude → Translation (architectural dependency)
-
-**Secondary Important Variables:**
-- **Mass `m`**: Critical for computing forces (F = ma) and tracking fuel consumption
-- **Quaternion `[q0, q1, q2, q3]`**: Essential for attitude control and aerodynamic force computation
-- **Angular Velocity `[wx, wy, wz]`**: Required for rotational dynamics
-
-### 1.8 Model Input and Output
-
-**Model Input** (Direction D1.5.4):
-- `t`: Time grid `[batch, N, 1]` (nondimensional)
-- `context`: Context vector `[batch, context_dim]` where `context_dim = 7`
-- `T_mag`: Thrust magnitude `[batch, N, 1]` (v2 feature, nondimensional)
-- `q_dyn`: Dynamic pressure `[batch, N, 1]` (v2 feature, nondimensional)
-
-**Model Output**:
-- `state`: `[batch, N, 14]` - Complete 6-DOF state at each time step
+The network outputs `state`: `[batch, N, 14]`, representing the full trajectory for each sample.
 
 ---
 
@@ -499,8 +448,64 @@ L_total = λ_data·L_data + λ_phys·L_phys + λ_bc·L_bc + L_soft_physics
 **Model Type**: `DirectionDPINN_D154` (Direction D1.5.4)
 
 **Architecture Overview:**
-```
-Input → InputBlockV2 → Backbone → [Head G3, Head G2, Head G1] → State Output
+
+```mermaid
+flowchart LR
+    subgraph Inputs
+        T[Time t]
+        C[Context (m0, Isp, Cd, CL_alpha, Cm_alpha, Tmax, wind_mag)]
+        TM[T_mag (v2)]
+        QD[q_dyn (v2)]
+    end
+
+    subgraph InputBlockV2
+        TE[Time Embedding\n(Fourier)]
+        CE[Context Encoder\nMLP]
+        EE[Extra Features\nMLP (T_mag, q_dyn)]
+    end
+
+    subgraph Backbone
+        B1[MLP Layer 1]
+        B2[MLP Layer 2]
+        B3[MLP Layer 3]
+        B4[MLP Layer 4]
+    end
+
+    subgraph Heads
+        G3[Head G3:\nMass m]
+        G2[Head G2:\nAttitude q,\nAngular vel w]
+        G1[Head G1:\nPosition x,\nVelocity v]
+    end
+
+    subgraph Output
+        S[State Trajectory\n(x, y, z, vx, vy, vz,\nq0..q3, wx, wy, wz, m)]
+    end
+
+    %% Input fusion
+    T --> TE
+    C --> CE
+    TM --> EE
+    QD --> EE
+
+    TE -->|concat| B1
+    CE -->|concat| B1
+    EE -->|concat| B1
+
+    %% Backbone
+    B1 --> B2 --> B3 --> B4
+
+    %% Dependency-aware heads
+    B4 --> G3
+    B4 --> G2
+    B4 --> G1
+
+    G3 -->|m| G2
+    G2 -->|q, w| G1
+
+    %% Final state assembly
+    G1 --> S
+    G2 --> S
+    G3 --> S
 ```
 
 ### 3.2 Detailed Structure
