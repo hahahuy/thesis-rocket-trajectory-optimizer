@@ -614,19 +614,15 @@ These numbers show that the model maintains **physically stable quaternions**, *
 
 #### 3.4.2 Trajectory Visualizations
 
-The experiment also logs qualitative trajectory plots under:
-- `experiments/exp14_01_12_direction_d153_position_stability/figures/trajectory_case_0.png`
-- `experiments/exp14_01_12_direction_d153_position_stability/figures/trajectory_case_1.png`
-- `experiments/exp14_01_12_direction_d153_position_stability/figures/trajectory_case_2.png`
+**2D trajectories (altitude/velocity over time):**
 
-These 2D trajectory plots compare **true vs. predicted altitude/velocity profiles** over time and show:
-- Very close overlap in altitude `z(t)` for most of the ascent and descent.
-- Slight deviations near peak dynamic phases (max vertical velocity).
+![Trajectory case 0](../experiments/exp14_01_12_direction_d153_position_stability/figures/trajectory_case_0.png)
+![Trajectory case 1](../experiments/exp14_01_12_direction_d153_position_stability/figures/trajectory_case_1.png)
 
-For spatial intuition, 3D trajectories are provided in:
-- `experiments/exp14_01_12_direction_d153_position_stability/figures/trajectory_3d_case_0.png`
-- `experiments/exp14_01_12_direction_d153_position_stability/figures/trajectory_3d_case_1.png`
-- `experiments/exp14_01_12_direction_d153_position_stability/figures/trajectory_3d_case_2.png`
+**3D trajectories (spatial rocket path):**
+
+![3D trajectory case 0](../experiments/exp14_01_12_direction_d153_position_stability/figures/trajectory_3d_case_0.png)
+![3D trajectory case 1](../experiments/exp14_01_12_direction_d153_position_stability/figures/trajectory_3d_case_1.png)
 
 In these 3D plots:
 - The rocket path remains **near‑vertical** (consistent with the vertical‑only dataset).
