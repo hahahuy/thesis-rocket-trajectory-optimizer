@@ -14,7 +14,8 @@
      - 7.6. [Direction D1.5: Soft-Physics Dependency Backbone](#76-direction-d15-soft-physics-dependency-backbone)
      - 7.7. [Direction D1.5.1: Position-Velocity Consistency](#77-direction-d151-position-velocity-consistency)
      - 7.8. [Direction D1.5.2: Horizontal Motion Suppression](#78-direction-d152-horizontal-motion-suppression)
-   - 7. [Direction D: Dependency-Aware Backbone + Causal Heads](#7-direction-d-dependency-aware-backbone--causal-heads)
+     - 7.9. [Direction D1.5.3: V2 Dataloader and Loss Function](#79-direction-d153-v2-dataloader-and-loss-function)
+   - 8. [Direction AN: Shared Stem + Mission Branches + Physics Residuals](#8-direction-an-shared-stem--mission-branches--physics-residuals)
 
 ---
 
@@ -1905,7 +1906,7 @@ Dataset (HDF5) → DataLoader
 
 ### 7.9 Direction D1.5 Series Summary
 
-**Evolution Path**: D → D1 → D1.5 → D1.5.1 → D1.5.2
+**Evolution Path**: D → D1 → D1.5 → D1.5.1 → D1.5.2 → D1.5.3
 
 | Direction | Key Innovation | Total RMSE | Best Component |
 |-----------|----------------|------------|----------------|
@@ -1914,6 +1915,7 @@ Dataset (HDF5) → DataLoader
 | **D1.5** | Soft physics + mass monotonicity | 0.199 | Mass (0.018) |
 | **D1.5.1** | Position-velocity consistency | 0.200 | Rotation (0.131) |
 | **D1.5.2** | Horizontal suppression | **0.198** ✅ | Mass (0.015) |
+| **D1.5.3** | V2 dataloader + v2 loss | 0.198 | Mass (0.015) |
 
 **Key Achievements:**
 1. **Best Overall RMSE**: 0.198 (D1.5.2 exp11) - 34% better than Direction D baseline
@@ -1928,3 +1930,270 @@ Dataset (HDF5) → DataLoader
 3. Trade-off between horizontal suppression and horizontal position accuracy
 
 Direction D offers a low-latency alternative to the hybrid stack, while Direction D1 re-introduces physics structure without Shared Stem + Latent ODE overhead. Both will act as baselines for future Direction E ideas.
+
+---
+
+### 7.9 Direction D1.5.3: V2 Dataloader and Loss Function
+
+**Date**: 2025-12-01  
+**Experiment**: exp14_01_12_direction_d153_position_stability  
+**Total RMSE**: **0.198** ✅
+
+#### 7.9.1 What Changed Compared to Direction D1.5.2
+
+**Key Changes:**
+
+1. **V2 Dataloader Integration**:
+   - Uses `RocketDatasetV2` instead of `RocketDataset`
+   - Loads additional features: `T_mag` (thrust magnitude) and `q_dyn` (dynamic pressure)
+   - Data source: `data/processed_v2/` instead of `data/processed/`
+   - **Current Status**: Models receive `T_mag` and `q_dyn` in batches but currently ignore them
+   - **Future**: V2 model versions will use `InputBlockV2` to fuse v2 features
+
+2. **V2 Loss Function Adjustments**:
+   - **Reduced Soft Physics Weights**:
+     - `lambda_mass_residual: 0.025` (vs 0.05 in D1.5.2)
+     - `lambda_vz_residual: 0.025` (vs 0.05 in D1.5.2)
+     - `lambda_vxy_residual: 0.005` (vs 0.01 in D1.5.2)
+     - `lambda_smooth_z: 5.0e-5` (vs 1.0e-4 in D1.5.2)
+     - `lambda_smooth_vz: 1.0e-5` (vs 1.0e-4 in D1.5.2)
+   - **Position-Velocity Consistency**: `lambda_pos_vel: 0.5` (enabled)
+   - **Position Smoothing**: `lambda_smooth_pos: 0.0` (disabled)
+   - **Horizontal Motion Suppression**: All disabled (0.0)
+     - Rationale: V2 features should naturally help with horizontal motion
+
+**Preserved Components:**
+- Same architecture as D1.5 (DirectionDPINN_D15)
+- Same structural constraints (mass monotonicity, 6D rotation)
+- Same phase schedule structure (55% data-only, 45% physics ramp)
+
+#### 7.9.2 Data Flow Diagram
+
+```
+Dataset (HDF5 v2) → RocketDatasetV2
+    │
+    ├─ t: [batch, N, 1] ────────────────────┐
+    ├─ context: [batch, 7] ──────────────────┤
+    ├─ T_mag: [batch, N] ───────────────────┤ (v2 NEW, currently unused)
+    └─ q_dyn: [batch, N] ───────────────────┤ (v2 NEW, currently unused)
+                                              │
+                                              ▼
+                                    ┌──────────────────┐
+                                    │ Direction D1.5  │
+                                    │ Architecture    │
+                                    │ (same as D1.5) │
+                                    └────────┬─────────┘
+                                             │
+                                             │ state: [batch, N, 14]
+                                             │
+                                    ┌────────▼─────────┐
+                                    │ V2 Loss Function │
+                                    │ (reduced weights)│
+                                    └──────────────────┘
+```
+
+#### 7.9.3 Why It Would Be Better
+
+1. **V2 Features Provide Physics Information**: T_mag and q_dyn encode physics-critical information directly, reducing information bottleneck
+2. **Lighter Physics Losses**: Since v2 features provide physics info, explicit physics loss penalties can be lighter
+3. **Simplified Loss Function**: Disabled horizontal suppression and position smoothing (v2 features should naturally help)
+4. **Future-Proof**: Prepares for v2 model versions that will actually use T_mag and q_dyn via `InputBlockV2`
+
+#### 7.9.4 Results (exp14)
+
+| Metric | Value |
+|--------|-------|
+| **Total RMSE** | **0.198** ✅ |
+| **Translation RMSE** | 0.266 |
+| **Rotation RMSE** | 0.132 |
+| **Mass RMSE** | 0.015 |
+| **Quaternion Norm** | 1.0 (perfect) |
+
+**Key Observations:**
+- ✅ Matches D1.5.2 performance (0.198 RMSE)
+- ✅ Excellent mass prediction (0.015 RMSE)
+- ✅ Perfect quaternion normalization
+- ⚠️ V2 features currently unused (future: v2 model versions will use them)
+
+---
+
+## 8. Direction AN: Shared Stem + Mission Branches + Physics Residuals
+
+**Date**: 2025-12-02  
+**Experiments**: exp15_02_12_direction_an_baseline, exp16_04_12_direction_an_v2, exp17_04_12_direction_an_v2  
+**Total RMSE**: **0.197** ✅ (exp15, exp16, exp17)
+
+### 8.1 What Changed Compared to Direction D1.5
+
+**Key Architectural Changes:**
+
+1. **ANSharedStem** (Replaces Direction D's backbone):
+   - **Direction D1.5**: Shared backbone MLP (4×256) with dependency heads
+   - **Direction AN**: ANSharedStem with residual MLP stack
+     - Fourier time features (8 frequencies → 17D)
+     - ContextEncoder (7 → 128, Tanh)
+     - Residual MLP stack (4 layers × 128, Tanh, LayerNorm)
+     - **Purpose**: Unified feature extraction with residual connections for stability
+
+2. **Mission Branches** (Independent, not dependency-ordered):
+   - **Direction D1.5**: Dependency-ordered heads (G3 → G2 → G1)
+   - **Direction AN**: Independent branches (all receive same latent)
+     - TranslationBranch: `[128→128→128→6]` for `[x, y, z, vx, vy, vz]`
+     - RotationBranch: `[128→256→256→7]` for `[q0, q1, q2, q3, wx, wy, wz]`
+     - MassBranch: `[128→64→1]` for `[m]`
+   - **Key Difference**: No dependency chain; all branches operate independently on shared latent
+
+3. **Physics Residual Layer** (New Component):
+   - **Direction D1.5**: Soft physics residuals computed in loss function
+   - **Direction AN**: Explicit `PhysicsResidualLayer` that computes residuals using autograd
+     - Uses `compute_dynamics` from physics library
+     - Returns `PhysicsResiduals` dataclass with ODE residuals
+     - **Purpose**: Provides physics residuals directly from forward pass, not just in loss
+
+4. **Dual Output**:
+   - **Direction D1.5**: Returns only state predictions
+   - **Direction AN**: Returns both `(state_pred, physics_residuals)`
+     - Enables flexible loss computation (can weight residuals differently)
+     - Physics residuals available for analysis and debugging
+
+**Preserved Components:**
+- Same input/output interface: `(t, context) → state`
+- Quaternion normalization (applied after rotation branch)
+- No initial_state required
+
+### 8.2 Data Flow Diagram
+
+```
+Dataset (HDF5) → DataLoader
+    │
+    ├─ t: [batch, N, 1] ────────────────────┐
+    ├─ context: [batch, 7] ─────────────────┤
+    └─ control: [batch, N, 4] (optional) ─┤
+                                              │
+                                              ▼
+                                    ┌──────────────────┐
+                                    │ ANSharedStem     │
+                                    │                  │
+                                    │ 1. TimeEmbedding │
+                                    │    (Fourier)     │
+                                    │    → [batch,N,17]│
+                                    │                  │
+                                    │ 2. ContextEncoder│
+                                    │    → [batch,N,128]│
+                                    │                  │
+                                    │ 3. Concatenate   │
+                                    │    → [batch,N,145]│
+                                    │                  │
+                                    │ 4. Residual MLP  │
+                                    │    4 layers×128  │
+                                    │    Tanh, LayerNorm│
+                                    │    → [batch,N,128]│
+                                    └────────┬─────────┘
+                                             │
+                                             │ latent: [batch, N, 128]
+                                             │
+                                    ┌────────▼─────────┐
+                                    │ Mission Branches │
+                                    │                  │
+                                    │ ┌──────┬──────┬─┐│
+                                    │ │Trans │Rot   │M││
+                                    │ │Branch│Branch│ ││
+                                    │ │[128→ │[128→ │[││
+                                    │ │128→  │256→  │1││
+                                    │ │128→6]│256→7]│2││
+                                    │ │      │      │8││
+                                    │ │      │      │→││
+                                    │ │      │      │1││
+                                    │ └──┬───┴──┬───┴─┘│
+                                    │    │      │      │
+                                    │ trans:│rotation:│mass:│
+                                    │[batch,│[batch,  │[batch,│
+                                    │N,6]   │N,7]     │N,1]  │
+                                    └───────┴─────────┴──────┘
+                                             │
+                                    ┌────────▼─────────┐
+                                    │ Quaternion Norm  │
+                                    │ normalize_quat()│
+                                    └────────┬─────────┘
+                                             │
+                                    ┌────────▼─────────┐
+                                    │ Pack State        │
+                                    │ [trans||rot||mass]│
+                                    └────────┬─────────┘
+                                             │
+                                             │ state: [batch, N, 14]
+                                             │
+                                    ┌────────▼─────────┐
+                                    │ Physics Residual │
+                                    │ Layer            │
+                                    │ (autograd-based) │
+                                    │ compute_dynamics │
+                                    └────────┬─────────┘
+                                             │
+                                             │ physics_residuals
+                                             │
+                                    ┌────────▼─────────┐
+                                    │ Output           │
+                                    │ (state, residuals)│
+                                    └──────────────────┘
+```
+
+### 8.3 Why It Would Be Better
+
+1. **Residual Connections**: ANSharedStem uses residual MLP stack for better gradient flow and training stability
+2. **Independent Branches**: Mission branches operate independently, avoiding dependency chain complexity
+3. **Explicit Physics Residuals**: Physics residuals computed in forward pass, enabling flexible loss weighting
+4. **Unified Stem**: Single shared stem processes all features together, similar to C2 but simpler (no Transformer)
+5. **Physics Integration**: Physics residual layer uses actual physics library, ensuring consistency with WP1
+
+### 8.4 Results
+
+**exp15 (2025-12-02) - Baseline**:
+| Metric | Value |
+|--------|-------|
+| **Total RMSE** | **0.197** ✅ |
+| **Translation RMSE** | 0.264 |
+| **Rotation RMSE** | 0.133 |
+| **Mass RMSE** | 0.015 |
+| **Quaternion Norm** | 1.0 (perfect) |
+
+**exp16 (2025-12-04) - V2**:
+| Metric | Value |
+|--------|-------|
+| **Total RMSE** | **0.197** ✅ |
+| **Translation RMSE** | 0.264 |
+| **Rotation RMSE** | 0.133 |
+| **Mass RMSE** | 0.015 |
+| **Quaternion Norm** | 1.0 (perfect) |
+
+**exp17 (2025-12-04) - V2 (continued)**:
+| Metric | Value |
+|--------|-------|
+| **Total RMSE** | **0.197** ✅ |
+| **Translation RMSE** | 0.264 |
+| **Rotation RMSE** | 0.133 |
+| **Mass RMSE** | 0.015 |
+| **Quaternion Norm** | 1.0 (perfect) |
+
+**Key Observations:**
+- ✅ Excellent performance (0.197 RMSE) - matches D1.5.2/D1.5.3
+- ✅ Best mass RMSE (0.015) - tied with D1.5.2
+- ✅ Perfect quaternion normalization
+- ✅ Consistent performance across v1 and v2 dataloaders
+- ✅ Physics residuals available for analysis
+
+### 8.5 Potential Drawbacks
+
+1. **No Dependency Chain**: Independent branches may miss physics dependencies (mass → attitude → translation)
+2. **Simpler Stem**: No Transformer or attention mechanism (vs C2's Shared Stem)
+3. **Physics Residual Overhead**: Computing residuals in forward pass adds computational cost
+4. **Less Specialized**: Branches don't receive specialized inputs (vs D1.5's dependency chain)
+
+### 8.6 V2 Support
+
+Direction AN supports v2 dataloader:
+- **AN (v1)**: Uses `ANSharedStem` with time + context only
+- **AN1 (v2)**: Uses `InputBlockV2` to fuse T_mag and q_dyn (future implementation)
+- **Current Status**: AN accepts but ignores v2 features (same as D1.5.3)
+
+---

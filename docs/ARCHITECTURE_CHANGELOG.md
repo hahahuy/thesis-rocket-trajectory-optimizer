@@ -909,3 +909,109 @@ loss:
 
 ---
 
+## [2025-12-02] Direction AN – Shared Stem + Mission Branches + Physics Residuals
+
+### Added Files
+- **`src/models/direction_an_pinn.py`**
+  - Class `DirectionANPINN`: Shared stem + mission branches + physics residual layer
+  - Class `ANSharedStem`: Residual MLP stem with Fourier features + context encoder
+  - Class `DirectionANPINN_AN1`: V2 version with `InputBlockV2` (future implementation)
+- **`src/physics/physics_residual_layer.py`**
+  - Class `PhysicsResidualLayer`: Computes physics residuals using autograd
+  - Class `PhysicsResiduals`: Dataclass for physics residual outputs
+- **`configs/train_an.yaml`** – Baseline AN training recipe
+- **`configs/train_an_v2.yaml`** – AN with v2 dataloader
+
+### Modified Files
+- **`src/models/__init__.py`** – exports `DirectionANPINN`, `DirectionANPINN_AN1`
+- **`src/train/train_pinn.py`** – adds `model_type: direction_an`
+- **`run_evaluation.py`** – evaluation support for `direction_an`
+- **`docs/architecture_diagram.md`** – added AN architecture diagram
+
+### Architecture Details
+
+1. **ANSharedStem**:
+   - Time: FourierFeatures (8 frequencies → 17D)
+   - Context: ContextEncoder (7 → 128, Tanh)
+   - Residual MLP stack: 4 layers × 128, Tanh, LayerNorm
+   - Output: `[batch, N, 128]` latent features
+   - **Key Feature**: Residual connections for gradient flow stability
+
+2. **Mission Branches** (Independent):
+   - **TranslationBranch**: `[128→128→128→6]` for `[x, y, z, vx, vy, vz]`
+   - **RotationBranch**: `[128→256→256→7]` for `[q0, q1, q2, q3, wx, wy, wz]`
+   - **MassBranch**: `[128→64→1]` for `[m]`
+   - **Key Difference**: All branches receive same latent (no dependency chain)
+
+3. **Physics Residual Layer**:
+   - Uses `compute_dynamics` from physics library (WP1)
+   - Computes ODE residuals using autograd
+   - Returns `PhysicsResiduals` dataclass
+   - **Purpose**: Provides physics residuals directly from forward pass
+
+4. **Dual Output**:
+   - Returns `(state_pred, physics_residuals)`
+   - Enables flexible loss computation
+   - Physics residuals available for analysis
+
+### Key Features
+- **Residual Stem**: Residual MLP stack for better gradient flow
+- **Independent Branches**: No dependency chain (simpler than D1.5)
+- **Explicit Physics**: Physics residuals computed in forward pass
+- **Unified Processing**: Single shared stem processes all features
+- **Physics Integration**: Uses actual physics library (WP1 consistency)
+
+### Configuration
+
+```yaml
+model:
+  type: direction_an
+  fourier_features: 8
+  stem_hidden_dim: 128
+  stem_layers: 4
+  activation: tanh
+  layer_norm: true
+  translation_branch_dims: [128, 128]
+  rotation_branch_dims: [256, 256]
+  mass_branch_dims: [64]
+  dropout: 0.0
+```
+
+### Rationale
+- **Alternative to Dependency Chain**: Independent branches avoid complexity of ordered heads
+- **Residual Connections**: Better gradient flow than plain MLP
+- **Explicit Physics**: Physics residuals computed directly, not just in loss
+- **Unified Stem**: Simpler than C2's Transformer-based Shared Stem
+- **Physics Consistency**: Uses WP1 physics library for residual computation
+
+### Implementation Status
+- ✅ Code integrated and tested
+- ✅ `exp15_02_12_direction_an_baseline` completed (RMSE: **0.197** ✅)
+- ✅ `exp16_04_12_direction_an_v2` completed (RMSE: **0.197** ✅)
+- ✅ `exp17_04_12_direction_an_v2` completed (RMSE: **0.197** ✅)
+- ✅ V2 dataloader support (models accept but ignore T_mag, q_dyn)
+- 🔄 Future: `DirectionANPINN_AN1` will use `InputBlockV2` to fuse v2 features
+
+### Results
+
+**exp15 (2025-12-02) - Baseline**:
+- **Total RMSE**: **0.197** ✅
+- **Translation RMSE**: 0.264
+- **Rotation RMSE**: 0.133
+- **Mass RMSE**: 0.015 (excellent)
+- **Quaternion Norm**: 1.0 (perfect)
+
+**exp16-17 (2025-12-04) - V2**:
+- **Total RMSE**: **0.197** ✅ (consistent with baseline)
+- Same performance metrics as exp15
+- V2 dataloader works correctly (features loaded but unused)
+
+### Notes
+- **No Dependency Chain**: Unlike D1.5, branches are independent (may miss physics dependencies)
+- **Simpler than C2**: No Transformer or attention mechanism
+- **Physics Residual Overhead**: Computing residuals in forward pass adds computational cost
+- **Excellent Performance**: Matches D1.5.2/D1.5.3 performance (0.197 RMSE)
+- **V2 Support**: Accepts v2 features but doesn't use them yet (future: AN1 will use InputBlockV2)
+
+---
+

@@ -444,6 +444,119 @@ graph TD
     style AB fill:#c8e6c9,color:#000000
 ```
 
+## Direction D1.5.3: V2 Dataloader and Loss Function
+
+Same architecture as Direction D1.5, but uses v2 dataloader (T_mag, q_dyn) and adjusted loss weights. Models receive v2 features but currently ignore them (future: v2 model versions will use InputBlockV2).
+
+```mermaid
+graph TD
+    A["t: batch×N×1"] --> B["FourierFeatures<br/>8 freq → 17D"]
+    C["context: batch×7"] --> D["ContextEncoder<br/>7→32, GELU"]
+    E["T_mag: batch×N"] --> F["V2 Dataloader<br/>(loaded but unused)"]
+    G["q_dyn: batch×N"] --> F
+    B --> H["t_emb: batch×N×17"]
+    D --> I["ctx_emb: batch×N×32"]
+    H --> J["Concatenate<br/>t_emb || ctx_emb"]
+    I --> J
+    J --> K["Shared Backbone<br/>MLP 4×256"]
+    
+    K --> L["G3 Mass Head<br/>[128,64]→1"]
+    C --> M["m0 context"]
+    L --> N["m_pred"]
+    M --> N
+    N --> O["Monotonic<br/>cumsum(-softplus)"]
+    
+    K --> P["latent copy"]
+    O --> Q["m copy"]
+    P --> R
+    Q --> R
+    R --> S["G2 Head<br/>6D rot + ω"]
+    S --> T["6D→quat || normalize q"]
+    
+    K --> U["latent copy₂"]
+    O --> V
+    T --> W
+    S --> X
+    U --> Y["Concat latent || m || q || ω"]
+    V --> Y
+    W --> Y
+    X --> Y
+    Y --> Z["G1 Translation Head<br/>[256,128,128,64]→6"]
+    
+    Z --> AA["translation"]
+    T --> AB["rotation"]
+    X --> AC["angular vel"]
+    O --> AD["mass"]
+    AA --> AE["state: batch×N×14"]
+    AB --> AE
+    AC --> AE
+    AD --> AE
+    
+    F -.->|"Future: InputBlockV2"| K
+    
+    style A fill:#e1f5ff,color:#000000
+    style C fill:#e1f5ff,color:#000000
+    style E fill:#e1f5ff,color:#000000
+    style G fill:#e1f5ff,color:#000000
+    style F fill:#ffebee,color:#000000
+    style K fill:#fff9c4,color:#000000
+    style L fill:#ffecb3,color:#000000
+    style S fill:#ffe0b2,color:#000000
+    style Z fill:#ffccbc,color:#000000
+    style AE fill:#c8e6c9,color:#000000
+```
+
+## Direction AN: Shared Stem + Mission Branches + Physics Residuals
+
+Shared stem with residual MLP, independent mission branches, and physics residual layer that computes residuals using autograd.
+
+```mermaid
+graph TD
+    A["t: batch×N×1"] --> B["TimeEmbedding<br/>FourierFeatures<br/>8 frequencies"]
+    C["context: batch×7"] --> D["ContextEncoder<br/>7→128, Tanh"]
+    B --> E["t_emb: batch×N×17"]
+    D --> F["ctx_emb: batch×128"]
+    E --> G["Broadcast ctx_emb<br/>to batch×N×128"]
+    F --> G
+    G --> H["Concatenate<br/>t_emb || ctx_emb"]
+    H --> I["ANSharedStem<br/>Residual MLP<br/>4 layers × 128<br/>Tanh, LayerNorm"]
+    I --> J["latent: batch×N×128"]
+    
+    J --> K1["TranslationBranch<br/>128→128→128→6"]
+    J --> K2["RotationBranch<br/>128→256→256→7"]
+    J --> K3["MassBranch<br/>128→64→1"]
+    
+    K1 --> L1["translation: 6D<br/>[x,y,z,vx,vy,vz]"]
+    K2 --> L2["rotation: 7D<br/>[q0,q1,q2,q3,wx,wy,wz]"]
+    K3 --> L3["mass: 1D<br/>[m]"]
+    
+    L2 --> M["Quaternion Normalization"]
+    L1 --> N["Pack State"]
+    M --> N
+    L3 --> N
+    N --> O["state: batch×N×14"]
+    
+    O --> P["Physics Residual Layer<br/>Autograd-based<br/>compute_dynamics"]
+    A --> P
+    Q["control: batch×N×4"] --> P
+    P --> R["PhysicsResiduals<br/>ODE residuals"]
+    
+    O --> S["Output"]
+    R --> S
+    
+    style A fill:#e1f5ff,color:#000000
+    style C fill:#e1f5ff,color:#000000
+    style Q fill:#e1f5ff,color:#000000
+    style I fill:#fff9c4,color:#000000
+    style J fill:#fff9c4,color:#000000
+    style K1 fill:#f8bbd0,color:#000000
+    style K2 fill:#f8bbd0,color:#000000
+    style K3 fill:#f8bbd0,color:#000000
+    style P fill:#d1c4e9,color:#000000
+    style O fill:#c8e6c9,color:#000000
+    style S fill:#c8e6c9,color:#000000
+```
+
 ## Architecture Comparison Summary
 
 | Architecture | Key Features | RMSE (Typical) |
@@ -457,6 +570,9 @@ graph TD
 | **Direction C3** | C2 + 6 RMSE reduction solutions | Target: 0.60-0.75 |
 | **Direction D** | Dependency-aware backbone with ordered heads | ~0.30 |
 | **Direction D1** | Direction D + physics features + RK4 integration | ~0.28-0.29 |
+| **Direction D1.5** | D + soft physics + mass monotonicity + 6D rotation | ~0.20 |
+| **Direction D1.5.3** | D1.5 + v2 dataloader (T_mag, q_dyn) + v2 loss | TBD |
+| **Direction AN** | Shared stem + mission branches + physics residuals | TBD |
 
 ## Component Relationships
 
@@ -471,6 +587,9 @@ graph LR
     F --> G["Direction C3<br/>+ 6 Solutions"]
     A --> H["Direction D<br/>Dependency Backbone"]
     H --> I["Direction D1<br/>Physics-Aware"]
+    H --> J["Direction D1.5<br/>Soft Physics"]
+    J --> K["Direction D1.5.3<br/>V2 Dataloader"]
+    A --> L["Direction AN<br/>Shared Stem + Branches"]
     
     style A fill:#e1f5ff,color:#000000
     style B fill:#fff9c4,color:#000000
@@ -481,6 +600,9 @@ graph LR
     style G fill:#a5d6a7,color:#000000
     style H fill:#b3e5fc,color:#000000
     style I fill:#90caf9,color:#000000
+    style J fill:#81d4fa,color:#000000
+    style K fill:#64b5f6,color:#000000
+    style L fill:#ce93d8,color:#000000
 ```
 
 ## Data Flow Summary
