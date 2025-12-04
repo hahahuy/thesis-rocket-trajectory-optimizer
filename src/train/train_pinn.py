@@ -399,10 +399,9 @@ def main():
     with open(logs_dir / "config.yaml", "w") as f:
         yaml.dump(config, f)
     
-    # Device - Force CPU for testing
-    # [PINN_V2][2025-01-XX][Temporary] Force CPU for testing
-    device = torch.device("cpu")
-    print(f"Using device: {device} (forced CPU for testing)")
+    # Device - Use GPU if available, otherwise CPU
+    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+    print(f"Using device: {device}")
     
     # Load physics parameters
     phys_path = config.get("physics_config", "configs/phys.yaml")
