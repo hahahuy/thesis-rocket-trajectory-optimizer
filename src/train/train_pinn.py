@@ -537,6 +537,43 @@ def main():
             physics_params=physics_params,
             physics_scales=scales,
         ).to(device)
+    elif model_type == "direction_d154":
+        from src.models.direction_d_pinn import DirectionDPINN_D154
+        
+        model = DirectionDPINN_D154(
+            context_dim=context_dim,
+            fourier_features=int(model_cfg.get("fourier_features", 8)),
+            context_embedding_dim=int(model_cfg.get("context_embedding_dim", 32)),
+            extra_embedding_dim=int(model_cfg.get("extra_embedding_dim", 16)),
+            backbone_hidden_dims=model_cfg.get("backbone_hidden_dims", [256, 256, 256, 256]),
+            head_g3_hidden_dims=model_cfg.get("head_g3_hidden_dims", [128, 64]),
+            head_g2_hidden_dims=model_cfg.get("head_g2_hidden_dims", [256, 128, 64]),
+            head_g1_hidden_dims=model_cfg.get("head_g1_hidden_dims", [256, 128, 128, 64]),
+            activation=model_cfg.get("activation", "gelu"),
+            layer_norm=bool(model_cfg.get("layer_norm", True)),
+            dropout=safe_float(model_cfg.get("dropout"), 0.0),
+            use_rotation_6d=bool(model_cfg.get("use_rotation_6d", True)),
+            enforce_mass_monotonicity=bool(model_cfg.get("enforce_mass_monotonicity", False)),
+        ).to(device)
+    elif model_type == "direction_an1":
+        from src.models.direction_an_pinn import DirectionANPINN_AN1
+
+        model = DirectionANPINN_AN1(
+            context_dim=context_dim,
+            fourier_features=int(model_cfg.get("fourier_features", 8)),
+            context_embedding_dim=int(model_cfg.get("context_embedding_dim", 32)),
+            extra_embedding_dim=int(model_cfg.get("extra_embedding_dim", 16)),
+            stem_hidden_dim=int(model_cfg.get("stem_hidden_dim", 128)),
+            stem_layers=int(model_cfg.get("stem_layers", 4)),
+            activation=model_cfg.get("activation", "tanh"),
+            layer_norm=bool(model_cfg.get("layer_norm", True)),
+            translation_branch_dims=model_cfg.get("translation_branch_dims", [128, 128]),
+            rotation_branch_dims=model_cfg.get("rotation_branch_dims", [256, 256]),
+            mass_branch_dims=model_cfg.get("mass_branch_dims", [64]),
+            dropout=safe_float(model_cfg.get("dropout"), 0.0),
+            physics_params=physics_params,
+            physics_scales=scales,
+        ).to(device)
     elif model_type == "latent_ode":
         from src.models.latent_ode import RocketLatentODEPINN
         model = RocketLatentODEPINN(
@@ -665,7 +702,8 @@ def main():
         raise ValueError(
             "Unknown model type: "
             f"{model_type}. Supported: 'pinn', 'latent_ode', 'sequence', 'hybrid', "
-            "'hybrid_c1', 'hybrid_c2', 'hybrid_c3', 'direction_d', 'direction_d1', 'direction_d15'"
+            "'hybrid_c1', 'hybrid_c2', 'hybrid_c3', 'direction_d', 'direction_d1', 'direction_d15', "
+            "'direction_d154', 'direction_an', 'direction_an1'"
         )
     
     print(f"Model parameters: {sum(p.numel() for p in model.parameters()):,}")

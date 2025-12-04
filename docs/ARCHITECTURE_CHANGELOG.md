@@ -811,3 +811,101 @@ model:
 
 ---
 
+## [2025-12-01] Direction D1.5.3 – V2 Dataloader and Loss Function
+
+### Modified Files
+- **`configs/train_direction_d153_v2.yaml`**
+  - Enabled v2 dataloader (`use_v2_dataloader: true`)
+  - Reduced soft physics loss weights for v2
+  - Disabled horizontal motion suppression
+  - Adjusted phase schedule parameters
+
+### Architecture Details
+- **Same architecture as D1.5**: Uses `DirectionDPINN_D15` model (no structural changes)
+- **V2 Dataloader Integration**:
+  - Uses `RocketDatasetV2` instead of `RocketDataset`
+  - Loads additional features: `T_mag` (thrust magnitude) and `q_dyn` (dynamic pressure)
+  - Data source: `data/processed_v2/` instead of `data/processed/`
+  - Models receive `T_mag` and `q_dyn` in batches but currently ignore them (future: v2 model versions will use `InputBlockV2`)
+
+- **V2 Loss Function Adjustments**:
+  1. **Reduced Soft Physics Weights** (vs D1.5.2):
+     - `lambda_mass_residual: 0.025` (vs 0.05 in D1.5.2)
+     - `lambda_vz_residual: 0.025` (vs 0.05 in D1.5.2)
+     - `lambda_vxy_residual: 0.005` (vs 0.01 in D1.5.2)
+     - `lambda_smooth_z: 5.0e-5` (vs 1.0e-4 in D1.5.2)
+     - `lambda_smooth_vz: 1.0e-5` (vs 1.0e-4 in D1.5.2)
+     - **Rationale**: V2 features (T_mag, q_dyn) provide physics information directly, reducing need for strong physics loss penalties
+
+  2. **Position-Velocity Consistency**:
+     - `lambda_pos_vel: 0.5` (same as D1.5.1)
+     - `lambda_smooth_pos: 0.0` (disabled, vs 2.0e-3 in D1.5.3 non-v2)
+
+  3. **Horizontal Motion Suppression** (Disabled):
+     - All horizontal suppression losses set to 0.0:
+       - `lambda_zero_vxy: 0.0`
+       - `lambda_zero_axy: 0.0`
+       - `lambda_hacc: 0.0`
+       - `lambda_xy_zero: 0.0`
+     - **Rationale**: V2 features should naturally help with horizontal motion, so explicit suppression not needed
+
+  4. **Phase Schedule**:
+     - `phase1_ratio: 0.55` (55% data-only, 45% physics ramp)
+     - `ramp: cosine` (smooth transition)
+     - Extended training: 160 epochs
+     - Phase 2 early stopping patience: 40
+
+### Rationale
+- **V2 Dataloader**: Provides physics-critical features (T_mag, q_dyn) directly to models, reducing information bottleneck
+- **Reduced Loss Weights**: V2 features encode physics information, so explicit physics loss penalties can be lighter
+- **Disabled Horizontal Suppression**: V2 features should naturally guide model toward correct horizontal behavior
+- **Future-Proof**: Prepares for v2 model versions that will actually use T_mag and q_dyn via `InputBlockV2`
+
+### Key Features
+- **V2 Data Pipeline**: Uses processed_v2 data with T_mag and q_dyn features
+- **Lighter Physics Losses**: Reduced weights since v2 features provide physics information
+- **Simplified Loss Function**: Disabled horizontal suppression and position smoothing
+- **Backward Compatible**: Model accepts but ignores v2 features (no errors)
+
+### Configuration
+
+```yaml
+train:
+  use_v2_dataloader: true  # Enable v2 dataloader
+  data_dir: data/processed_v2  # Use v2 processed data
+
+loss:
+  # Reduced soft physics weights for v2
+  lambda_mass_residual: 0.025
+  lambda_vz_residual: 0.025
+  lambda_vxy_residual: 0.005
+  lambda_smooth_z: 5.0e-5
+  lambda_smooth_vz: 1.0e-5
+  
+  # Position-velocity consistency (enabled)
+  lambda_pos_vel: 0.5
+  lambda_smooth_pos: 0.0  # Disabled
+  
+  # Horizontal suppression (all disabled)
+  lambda_zero_vxy: 0.0
+  lambda_zero_axy: 0.0
+  lambda_hacc: 0.0
+  lambda_xy_zero: 0.0
+```
+
+### Implementation Status
+- ✅ Code integrated
+- ✅ `configs/train_direction_d153_v2.yaml` created
+- ✅ V2 dataloader support in training script
+- ⚠️ Models currently ignore T_mag and q_dyn (loaded but unused)
+- 🔄 Future: Create v2 model versions with `InputBlockV2` to actually use v2 features
+
+### Notes
+- **Current Limitation**: Models accept T_mag and q_dyn but don't use them in forward pass
+- **To Actually Use V2 Features**: Need to create v2 model versions (e.g., `DirectionDPINN_D15_V2`) that use `InputBlockV2`
+- **Data Requirements**: Requires v2 preprocessing (`python -m src.data.preprocess_v2`)
+- **Backward Compatible**: V2 dataloader gracefully handles missing v2 features (returns zeros)
+- **Training**: Proceeds normally with v2 dataloader, just with additional (unused) features in batches
+
+---
+

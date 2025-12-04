@@ -38,6 +38,7 @@ import torch.nn as nn
 from .architectures import FourierFeatures, ContextEncoder, normalize_quaternion
 from .branches import TranslationBranch, RotationBranch, MassBranch
 from src.physics.physics_residual_layer import PhysicsResidualLayer, PhysicsResiduals
+from .input_block_v2 import InputBlockV2
 
 
 class ANSharedStem(nn.Module):
@@ -302,6 +303,223 @@ class DirectionANPINN(nn.Module):
         Convenience wrapper returning only the state prediction.
         """
         state, _ = self.forward(t, context, control)
+        return state
+
+
+class DirectionANPINN_AN1(nn.Module):
+    """
+    Direction AN1: V2 version of AN with InputBlockV2 (T_mag + q_dyn support).
+    
+    Key differences vs Direction AN:
+    - Uses InputBlockV2 instead of ANSharedStem to fuse T_mag and q_dyn features
+    - All other architecture remains the same (mission branches + physics layer)
+    - Requires T_mag and q_dyn as inputs (from v2 dataloader)
+    
+    Forward returns:
+        state_pred, physics_residuals
+    where:
+        state_pred       : [..., 14] packed state
+        physics_residuals: PhysicsResiduals dataclass
+    """
+    
+    requires_initial_state = False
+    
+    def __init__(
+        self,
+        context_dim: int,
+        fourier_features: int = 8,
+        context_embedding_dim: int = 32,
+        extra_embedding_dim: int = 16,  # For T_mag + q_dyn
+        stem_hidden_dim: int = 128,
+        stem_layers: int = 4,
+        activation: str = "tanh",
+        layer_norm: bool = True,
+        translation_branch_dims: Optional[list] = None,
+        rotation_branch_dims: Optional[list] = None,
+        mass_branch_dims: Optional[list] = None,
+        dropout: float = 0.0,
+        physics_params: Optional[dict] = None,
+        physics_scales: Optional[dict] = None,
+    ) -> None:
+        super().__init__()
+        
+        # V2 Input block: fuses time, context, T_mag, q_dyn
+        self.input_block = InputBlockV2(
+            context_dim=context_dim,
+            fourier_features=fourier_features,
+            context_embedding_dim=context_embedding_dim,
+            extra_embedding_dim=extra_embedding_dim,
+            output_dim=stem_hidden_dim,  # Project to stem_hidden_dim
+            activation=activation,
+            dropout=dropout,
+        )
+        
+        # Optional: Add residual MLP stack after input block (similar to ANSharedStem)
+        self.stem_layers = stem_layers
+        if stem_layers > 0:
+            layers = []
+            for i in range(stem_layers):
+                layers.append(nn.Linear(stem_hidden_dim, stem_hidden_dim))
+                if activation == "tanh":
+                    layers.append(nn.Tanh())
+                elif activation == "gelu":
+                    layers.append(nn.GELU())
+                elif activation == "relu":
+                    layers.append(nn.ReLU())
+                else:
+                    raise ValueError(f"Unknown activation: {activation}")
+            if layer_norm:
+                layers.append(nn.LayerNorm(stem_hidden_dim))
+            self.stem_mlp = nn.ModuleList(layers)
+        else:
+            self.stem_mlp = None
+        
+        # Mission branches (same as AN)
+        self.translation_branch = TranslationBranch(
+            hidden_dim=stem_hidden_dim,
+            branch_dims=translation_branch_dims or [128, 128],
+            activation=activation,
+            dropout=dropout,
+        )
+        self.rotation_branch = RotationBranch(
+            hidden_dim=stem_hidden_dim,
+            branch_dims=rotation_branch_dims or [256, 256],
+            activation=activation,
+            dropout=dropout,
+        )
+        self.mass_branch = MassBranch(
+            hidden_dim=stem_hidden_dim,
+            branch_dims=mass_branch_dims or [64],
+            activation=activation,
+            dropout=dropout,
+        )
+        
+        # Physics residual layer
+        self.physics_layer = PhysicsResidualLayer(
+            physics_params=physics_params,
+            scales=physics_scales,
+        )
+    
+    def _ensure_batched(
+        self, t: torch.Tensor, context: torch.Tensor
+    ) -> Tuple[torch.Tensor, torch.Tensor, bool]:
+        t_was_unbatched = False
+        
+        if t.dim() == 1:
+            t = t.unsqueeze(-1)
+        if t.dim() == 2:
+            t = t.unsqueeze(0)
+            t_was_unbatched = True
+        
+        if context.dim() == 1:
+            context = context.unsqueeze(0)
+        
+        return t, context, t_was_unbatched
+    
+    def forward(
+        self,
+        t: torch.Tensor,
+        context: torch.Tensor,
+        control: Optional[torch.Tensor] = None,
+        T_mag: torch.Tensor = None,
+        q_dyn: torch.Tensor = None,
+    ) -> Tuple[torch.Tensor, PhysicsResiduals]:
+        """
+        Full forward pass with v2 features.
+        
+        Args:
+            t: Time [..., 1] or [batch, N, 1]
+            context: Context [..., context_dim] or [batch, context_dim]
+            control: Optional control trajectory [..., 4] or [batch, N, 4]
+            T_mag: Thrust magnitude [..., 1] or [batch, N, 1] (required for v2)
+            q_dyn: Dynamic pressure [..., 1] or [batch, N, 1] (required for v2)
+            
+        Returns:
+            state: Predicted state [..., 14]
+            residuals: PhysicsResiduals object
+        """
+        if T_mag is None or q_dyn is None:
+            raise ValueError("DirectionANPINN_AN1 requires T_mag and q_dyn (v2 features)")
+        
+        t, context, was_unbatched = self._ensure_batched(t, context)
+        batch, N, _ = t.shape
+        
+        # Ensure T_mag and q_dyn are batched
+        if T_mag.dim() == 1:
+            T_mag = T_mag.unsqueeze(0).unsqueeze(-1)
+        elif T_mag.dim() == 2:
+            T_mag = T_mag.unsqueeze(-1)
+        if q_dyn.dim() == 1:
+            q_dyn = q_dyn.unsqueeze(0).unsqueeze(-1)
+        elif q_dyn.dim() == 2:
+            q_dyn = q_dyn.unsqueeze(-1)
+        
+        # V2 Input block: fuses time, context, T_mag, q_dyn
+        latent = self.input_block(t, context, T_mag, q_dyn)  # [batch, N, stem_hidden_dim]
+        
+        # Optional residual MLP stack
+        if self.stem_mlp is not None:
+            h = latent
+            # Process linear + activation pairs, then apply layer norm at the end
+            n_pairs = self.stem_layers
+            for i in range(0, n_pairs * 2, 2):
+                lin = self.stem_mlp[i]
+                act = self.stem_mlp[i + 1]
+                h_new = act(lin(h))
+                # Residual connection
+                h = h + h_new
+            # Apply layer norm if present (last element)
+            if len(self.stem_mlp) > n_pairs * 2:
+                norm = self.stem_mlp[-1]
+                h = norm(h)
+            latent = h
+        
+        # Ensure batched layout for branches and physics
+        if latent.dim() == 2:
+            latent = latent.unsqueeze(0)
+            t = t.unsqueeze(0) if t.dim() == 2 else t
+            context = context.unsqueeze(0) if context.dim() == 2 else context
+        
+        # Mission branches (independent subnetworks)
+        trans_out = self.translation_branch(latent)  # [batch, N, 6]
+        rot_out = self.rotation_branch(latent)  # [batch, N, 7]
+        mass_out = self.mass_branch(latent)  # [batch, N, 1]
+        
+        # Split rotation into quaternion + angular rates and normalize quaternion
+        q_pred = rot_out[..., :4]  # [batch, N, 4]
+        w_pred = rot_out[..., 4:]  # [batch, N, 3]
+        q_pred = normalize_quaternion(q_pred)
+        
+        # Translation split
+        x_pred = trans_out[..., :3]  # [batch, N, 3]
+        v_pred = trans_out[..., 3:]  # [batch, N, 3]
+        
+        # Pack final state
+        state = torch.cat(
+            [x_pred, v_pred, q_pred, w_pred, mass_out],
+            dim=-1,
+        )  # [batch, N, 14]
+        
+        # Physics residuals (finite-difference based)
+        residuals = self.physics_layer(t, state, control=control)
+        
+        if was_unbatched:
+            state = state.squeeze(0)
+        
+        return state, residuals
+    
+    def predict_trajectory(
+        self,
+        t: torch.Tensor,
+        context: torch.Tensor,
+        control: Optional[torch.Tensor] = None,
+        T_mag: torch.Tensor = None,
+        q_dyn: torch.Tensor = None,
+    ) -> torch.Tensor:
+        """
+        Convenience wrapper returning only the state prediction.
+        """
+        state, _ = self.forward(t, context, control, T_mag=T_mag, q_dyn=q_dyn)
         return state
 
 

@@ -24,6 +24,7 @@ from typing import Tuple, Optional
 
 from .architectures import FourierFeatures, ContextEncoder, normalize_quaternion
 from .physics_layers import PhysicsComputationLayer
+from .input_block_v2 import InputBlockV2
 
 
 class DirectionDPINN(nn.Module):
@@ -619,6 +620,266 @@ class DirectionDPINN_D15(nn.Module):
 
     def predict_trajectory(self, t: torch.Tensor, context: torch.Tensor) -> torch.Tensor:
         return self.forward(t, context)
+
+
+class DirectionDPINN_D154(nn.Module):
+    """
+    Direction D1.54: V2 version of D15 with InputBlockV2 (T_mag + q_dyn support).
+    
+    Key differences vs Direction D15:
+    - Uses InputBlockV2 to fuse T_mag and q_dyn features
+    - All other architecture remains the same (backbone + 3 heads)
+    - Requires T_mag and q_dyn as inputs (from v2 dataloader)
+    """
+    
+    requires_initial_state = False
+    
+    def __init__(
+        self,
+        context_dim: int,
+        fourier_features: int = 8,
+        context_embedding_dim: int = 32,
+        extra_embedding_dim: int = 16,  # For T_mag + q_dyn
+        backbone_hidden_dims: list = None,
+        head_g3_hidden_dims: list = None,
+        head_g2_hidden_dims: list = None,
+        head_g1_hidden_dims: list = None,
+        activation: str = "gelu",
+        layer_norm: bool = True,
+        dropout: float = 0.0,
+        use_rotation_6d: bool = True,
+        enforce_mass_monotonicity: bool = False,
+    ):
+        super().__init__()
+        
+        self.context_dim = context_dim
+        self.fourier_features = fourier_features
+        self.context_embedding_dim = context_embedding_dim
+        self.use_rotation_6d = use_rotation_6d
+        self.enforce_mass_monotonicity = enforce_mass_monotonicity
+        
+        # V2 Input block: fuses time, context, T_mag, q_dyn
+        self.input_block = InputBlockV2(
+            context_dim=context_dim,
+            fourier_features=fourier_features,
+            context_embedding_dim=context_embedding_dim,
+            extra_embedding_dim=extra_embedding_dim,
+            output_dim=None,  # No projection, use raw fused features
+            activation=activation,
+            dropout=dropout,
+        )
+        # InputBlockV2 output dimension
+        feature_dim = self.input_block.output_dim
+        
+        if backbone_hidden_dims is None:
+            backbone_hidden_dims = [256, 256, 256, 256]
+        self.backbone = DirectionDPINN._build_mlp(
+            self,
+            input_dim=feature_dim,
+            hidden_dims=backbone_hidden_dims,
+            output_dim=backbone_hidden_dims[-1],
+            activation=activation,
+            layer_norm=layer_norm,
+            dropout=dropout,
+        )
+        latent_dim = backbone_hidden_dims[-1]
+        
+        if head_g3_hidden_dims is None:
+            head_g3_hidden_dims = [128, 64]
+        self.head_g3 = DirectionDPINN._build_mlp(
+            self,
+            input_dim=latent_dim,
+            hidden_dims=head_g3_hidden_dims,
+            output_dim=1,
+            activation=activation,
+            layer_norm=layer_norm,
+            dropout=dropout,
+        )
+        
+        if head_g2_hidden_dims is None:
+            head_g2_hidden_dims = [256, 128, 64]
+        g2_output_dim = 6 + 3 if use_rotation_6d else 7
+        self.head_g2 = DirectionDPINN._build_mlp(
+            self,
+            input_dim=latent_dim + 1,
+            hidden_dims=head_g2_hidden_dims,
+            output_dim=g2_output_dim,
+            activation=activation,
+            layer_norm=layer_norm,
+            dropout=dropout,
+        )
+        
+        if head_g1_hidden_dims is None:
+            head_g1_hidden_dims = [256, 128, 128, 64]
+        self.head_g1 = DirectionDPINN._build_mlp(
+            self,
+            input_dim=latent_dim + 1 + 4 + 3,
+            hidden_dims=head_g1_hidden_dims,
+            output_dim=6,
+            activation=activation,
+            layer_norm=layer_norm,
+            dropout=dropout,
+        )
+    
+    def _ensure_batched(
+        self, t: torch.Tensor, context: torch.Tensor
+    ) -> Tuple[torch.Tensor, torch.Tensor, bool]:
+        t_was_unbatched = False
+        context_was_unbatched = False
+        
+        if t.dim() == 1:
+            t = t.unsqueeze(-1)
+        if t.dim() == 2:
+            t = t.unsqueeze(0)
+            t_was_unbatched = True
+        
+        if context.dim() == 1:
+            context = context.unsqueeze(0)
+            context_was_unbatched = True
+        
+        return t, context, t_was_unbatched and context_was_unbatched
+    
+    def _is_zero_aero(self, context: torch.Tensor, aero_tolerance: float = 1e-6) -> torch.Tensor:
+        """Check if aero parameters are zero (or near zero)."""
+        if context.dim() == 2:
+            cd = context[:, 2:3] if context.shape[1] > 2 else torch.zeros_like(context[:, 0:1])
+            cl_alpha = context[:, 3:4] if context.shape[1] > 3 else torch.zeros_like(context[:, 0:1])
+            cm_alpha = context[:, 4:5] if context.shape[1] > 4 else torch.zeros_like(context[:, 0:1])
+            aero_mag = torch.abs(cd) + torch.abs(cl_alpha) + torch.abs(cm_alpha)
+            return (aero_mag.squeeze(-1) < aero_tolerance)
+        else:
+            cd = context[..., 2:3] if context.shape[-1] > 2 else torch.zeros_like(context[..., 0:1])
+            cl_alpha = context[..., 3:4] if context.shape[-1] > 3 else torch.zeros_like(context[..., 0:1])
+            cm_alpha = context[..., 4:5] if context.shape[-1] > 4 else torch.zeros_like(context[..., 0:1])
+            aero_mag = torch.abs(cd) + torch.abs(cl_alpha) + torch.abs(cm_alpha)
+            return (aero_mag.squeeze(-1) < aero_tolerance)
+    
+    def forward(
+        self,
+        t: torch.Tensor,
+        context: torch.Tensor,
+        T_mag: torch.Tensor,
+        q_dyn: torch.Tensor,
+    ) -> torch.Tensor:
+        """
+        Forward pass with v2 features.
+        
+        Args:
+            t: Time [..., 1] or [batch, N, 1]
+            context: Context [..., context_dim] or [batch, context_dim]
+            T_mag: Thrust magnitude [..., 1] or [batch, N, 1] (required for v2)
+            q_dyn: Dynamic pressure [..., 1] or [batch, N, 1] (required for v2)
+            
+        Returns:
+            state: Predicted state [..., 14] or [batch, N, 14]
+        """
+        t, context, was_unbatched = self._ensure_batched(t, context)
+        batch_size, N, _ = t.shape
+        
+        # Ensure T_mag and q_dyn are batched
+        if T_mag.dim() == 1:
+            T_mag = T_mag.unsqueeze(0).unsqueeze(-1)
+        elif T_mag.dim() == 2:
+            T_mag = T_mag.unsqueeze(-1)
+        if q_dyn.dim() == 1:
+            q_dyn = q_dyn.unsqueeze(0).unsqueeze(-1)
+        elif q_dyn.dim() == 2:
+            q_dyn = q_dyn.unsqueeze(-1)
+        
+        # V2 Input block: fuses time, context, T_mag, q_dyn
+        features = self.input_block(t, context, T_mag, q_dyn)  # [batch, N, feature_dim]
+        
+        # Backbone
+        latent = self.backbone(features)  # [batch, N, latent_dim]
+        
+        # Expand context for zero-aero check
+        if context.dim() == 2:
+            context_expanded = context.unsqueeze(1).expand(batch_size, N, -1)
+        elif context.dim() == 3 and context.shape[1] == 1:
+            context_expanded = context.expand(batch_size, N, -1)
+        else:
+            context_expanded = context
+        
+        # Head G3: Mass
+        m_pred_raw = self.head_g3(latent)
+        if self.enforce_mass_monotonicity:
+            mass_delta = -F.softplus(m_pred_raw)
+            m0 = context_expanded[..., 0:1]
+            m_pred = torch.cumsum(mass_delta, dim=1) + m0
+        else:
+            m_pred = m_pred_raw
+        
+        # Head G2: Attitude
+        att_input = torch.cat([latent, m_pred], dim=-1)
+        att_output = self.head_g2(att_input)
+        
+        is_zero_aero = self._is_zero_aero(context_expanded)
+        
+        if self.use_rotation_6d:
+            sixd_rot = att_output[..., :6]
+            w_pred = att_output[..., 6:]
+            
+            identity_6d = torch.zeros_like(sixd_rot)
+            identity_6d[..., 0] = 1.0
+            identity_6d[..., 4] = 1.0
+            
+            is_zero_aero_expanded = is_zero_aero.unsqueeze(-1).expand_as(sixd_rot)
+            sixd_rot = torch.where(is_zero_aero_expanded, identity_6d, sixd_rot)
+            
+            R = sixd_to_rotation_matrix(sixd_rot)
+            q_pred = rotation_matrix_to_quaternion(R)
+            
+            w_pred = torch.where(is_zero_aero.unsqueeze(-1).expand_as(w_pred),
+                                torch.zeros_like(w_pred), w_pred)
+        else:
+            q_pred = att_output[..., :4]
+            q_pred = normalize_quaternion(q_pred)
+            w_pred = att_output[..., 4:]
+            
+            identity_q = torch.zeros_like(q_pred)
+            identity_q[..., 0] = 1.0
+            is_zero_aero_expanded = is_zero_aero.unsqueeze(-1).expand_as(q_pred)
+            q_pred = torch.where(is_zero_aero_expanded, identity_q, q_pred)
+            
+            w_pred = torch.where(is_zero_aero.unsqueeze(-1).expand_as(w_pred),
+                                torch.zeros_like(w_pred), w_pred)
+        
+        # Head G1: Translation
+        trans_input = torch.cat([latent, m_pred, q_pred, w_pred], dim=-1)
+        trans_output = self.head_g1(trans_input)
+        x_pred = trans_output[..., :3]
+        v_pred = trans_output[..., 3:]
+        
+        # Zero horizontal for zero-aero cases
+        is_zero_aero_expanded_xy = is_zero_aero.unsqueeze(-1).expand(batch_size, N, 2)
+        x_pred_horizontal = x_pred[..., :2]
+        x_pred_vertical = x_pred[..., 2:3]
+        x_pred_horizontal_zeroed = torch.where(is_zero_aero_expanded_xy,
+                                               torch.zeros_like(x_pred_horizontal),
+                                               x_pred_horizontal)
+        x_pred = torch.cat([x_pred_horizontal_zeroed, x_pred_vertical], dim=-1)
+        
+        v_pred_horizontal = v_pred[..., :2]
+        v_pred_vertical = v_pred[..., 2:3]
+        v_pred_horizontal_zeroed = torch.where(is_zero_aero_expanded_xy,
+                                              torch.zeros_like(v_pred_horizontal),
+                                              v_pred_horizontal)
+        v_pred = torch.cat([v_pred_horizontal_zeroed, v_pred_vertical], dim=-1)
+        
+        state = torch.cat([x_pred, v_pred, q_pred, w_pred, m_pred], dim=-1)
+        
+        if was_unbatched:
+            state = state.squeeze(0)
+        return state
+    
+    def predict_trajectory(
+        self,
+        t: torch.Tensor,
+        context: torch.Tensor,
+        T_mag: torch.Tensor,
+        q_dyn: torch.Tensor,
+    ) -> torch.Tensor:
+        return self.forward(t, context, T_mag, q_dyn)
 
 
 class TemporalIntegrator(nn.Module):
