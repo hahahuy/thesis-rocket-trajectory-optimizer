@@ -1,7 +1,8 @@
 model:
-  type: direction_d15
+  type: direction_d154
   fourier_features: 8
   context_embedding_dim: 32
+  extra_embedding_dim: 16  # Required for InputBlockV2 (T_mag + q_dyn embedding)
   backbone_hidden_dims: [256, 256, 256, 256]
   head_g3_hidden_dims: [128, 64]
   head_g2_hidden_dims: [256, 128, 64]
@@ -14,8 +15,8 @@ model:
 
 train:
   experiment_name: direction_d153_v2
-  batch_size: 8
-  num_workers: 0
+  batch_size: 16
+  num_workers: 4
   epochs: 160
   learning_rate: 1e-3
   weight_decay: 1e-5
