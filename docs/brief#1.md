@@ -578,3 +578,56 @@ flowchart TB
 - **Feature Reuse**: Shared backbone extracts common motion patterns
 - **Physics Integration**: v2 features (`T_mag`, `q_dyn`) provide direct physics information
 - **Stable Representations**: 6D rotation avoids quaternion normalization issues
+
+---
+
+### 3.4 Experiment Results (exp14 – Direction D1.53 Position Stability)
+
+#### 3.4.1 Quantitative Metrics
+
+Experiment `exp14_01_12_direction_d153_position_stability` evaluates Direction D1.53 (D1.5.4 with position stability tweaks) on the full test set.
+
+**Overall RMSE (normalized state):**
+- **Total RMSE**: `0.198`
+- **Translation RMSE** (position + velocity): `0.266`
+- **Rotation RMSE** (quaternion + angular velocity): `0.132`
+- **Mass RMSE**: `0.015`
+
+**Per‑component RMSE (normalized units):**
+- **Position / Velocity**:
+  - `x`: 0.0201, `y`: 0.0020, `z`: 0.0638
+  - `vx`: 0.2799, `vy`: 0.0014, `vz`: 0.5851
+- **Quaternion / Angular Velocity**:
+  - `q0`: 0.0764, `q1`: 0.0005, `q2`: 0.3410, `q3`: 0.0006
+  - `wx`: 0.0010, `wy`: 0.0090, `wz`: 0.0005
+- **Mass**:
+  - `m`: 0.0154
+
+**Stability Diagnostics:**
+- Mean state‑difference norm between consecutive timesteps: `≈ 2.75`
+- Max state‑difference norm: `≈ 7.62`
+- Quaternion norms after prediction:
+  - Mean: `1.0000`
+  - Std: `≈ 8.4 × 10⁻⁹` (effectively unit norm, numerically very stable)
+
+These numbers show that the model maintains **physically stable quaternions**, **smooth trajectories**, and **low mass error**, while the largest errors reside in high‑dynamic components (`vz`, `q2`, `vx`), which are expected to be the hardest to predict.
+
+#### 3.4.2 Trajectory Visualizations
+
+The experiment also logs qualitative trajectory plots under:
+- `experiments/exp14_01_12_direction_d153_position_stability/figures/trajectory_case_0.png`
+- `experiments/exp14_01_12_direction_d153_position_stability/figures/trajectory_case_1.png`
+- `experiments/exp14_01_12_direction_d153_position_stability/figures/trajectory_case_2.png`
+
+These 2D trajectory plots compare **true vs. predicted altitude/velocity profiles** over time and show:
+- Very close overlap in altitude `z(t)` for most of the ascent and descent.
+- Slight deviations near peak dynamic phases (max vertical velocity).
+
+For spatial intuition, 3D trajectories are provided in:
+- `experiments/exp14_01_12_direction_d153_position_stability/figures/trajectory_3d_case_0.png`
+- `experiments/exp14_01_12_direction_d153_position_stability/figures/trajectory_3d_case_1.png`
+- `experiments/exp14_01_12_direction_d153_position_stability/figures/trajectory_3d_case_2.png`
+
+In these 3D plots:
+- The rocket path remains **near‑vertical** (consistent with the vertical‑only dataset).
+- Predicted and ground‑truth trajectories are visually indistinguishable at this scale, confirming that the model captures the overall ascent/descent shape and end‑of‑burn altitude accurately.
