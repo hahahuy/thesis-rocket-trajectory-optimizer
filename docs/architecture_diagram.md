@@ -591,13 +591,6 @@ graph LR
     H --> J["Direction D1.5<br/>Soft Physics"]
     J --> K["Direction D1.5.3<br/>V2 Dataloader"]
     K --> K2["Direction D1.5.4<br/>Central Diff"]
-
----
-
-### Direction AN additions
-
-- **AN2 (additive variant)**: Keeps AN/AN1 unchanged; optional v2 inputs (T_mag, q_dyn) when `use_v2_inputs=True`; residual refinement stack; same mission branches and physics layer.
-- **Weight sweep helper**: `src/train/weight_sweep_an.py` provides `run_weight_sweep` over preset PINNLoss (v1) weights for AN/AN2. It returns `best_config` (the chosen weights with its `val_metric`) plus all `results`. Use it with a small `train_eval_fn` that trains/evaluates a model for one preset and returns a validation metric.
     A --> L["Direction AN<br/>Shared Stem + Branches"]
     
     style A fill:#e1f5ff,color:#000000
