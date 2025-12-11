@@ -900,12 +900,145 @@ loss:
 - ⚠️ Models currently ignore T_mag and q_dyn (loaded but unused)
 - 🔄 Future: Create v2 model versions with `InputBlockV2` to actually use v2 features
 
+### Results
+
+**exp14_01_12_direction_d153_position_stability**  
+- **Total RMSE**: **0.198**  
+- **Translation RMSE**: 0.266  
+- **Rotation RMSE**: 0.132  
+- **Mass RMSE**: 0.015  
+- **Quaternion Norm**: 1.0 (perfect)
+
 ### Notes
 - **Current Limitation**: Models accept T_mag and q_dyn but don't use them in forward pass
 - **To Actually Use V2 Features**: Need to create v2 model versions (e.g., `DirectionDPINN_D15_V2`) that use `InputBlockV2`
 - **Data Requirements**: Requires v2 preprocessing (`python -m src.data.preprocess_v2`)
 - **Backward Compatible**: V2 dataloader gracefully handles missing v2 features (returns zeros)
 - **Training**: Proceeds normally with v2 dataloader, just with additional (unused) features in batches
+
+---
+
+## [2025-12-05] Direction D1.5.4 – Central Difference Derivative Method
+
+### Added Files
+- **`src/physics/derivatives_v2.py`**
+  - Function `central_difference`: Computes time derivatives using central difference method
+  - Handles non-uniform time grids
+  - Boundary handling: forward difference at first point, backward difference at last point
+- **`src/train/losses_v2.py`**
+  - Class `PINNLossV2`: Extends `PINNLoss` with central difference derivative computation
+  - Component scaling for physics residuals (pos, vel, quat, ang, mass)
+  - Reweighted physics terms for better balance across state components
+- **`configs/train_direction_d154.yaml`** – D1.5.4 training recipe with central difference
+
+### Modified Files
+- **`src/train/train_pinn.py`** – adds support for `loss.type: PINNLossV2`
+- **`run_evaluation.py`** – evaluation support for D1.5.4
+
+### Architecture Details
+- **Backbone + Heads**: Same topology as D1.5 (MLP backbone + G3 mass, G2 rotation, G1 translation heads)
+- **Input Block Upgrade**: Uses `InputBlockV2` to fuse `t`, `context`, `T_mag`, `q_dyn` before backbone (unlike D1.5/1.5.3 which ignore v2 features)
+- **Key Change**: Derivative computation method
+  - **Previous (D1.5.3)**: Forward difference `ds/dt = (s(t+1) - s(t)) / dt`
+  - **D1.5.4**: Central difference `ds/dt = (s(t+1) - s(t-1)) / (2*dt)`
+  - **Rationale**: Central difference provides smoother and more accurate derivatives, especially for accelerations and rotations
+
+### Derivative Method Comparison
+
+**Forward Difference (v1)**:
+```python
+# For interior points
+ds/dt[i] = (s[i+1] - s[i]) / (t[i+1] - t[i])
+```
+- **Pros**: Simple, only needs next point
+- **Cons**: Less accurate, asymmetric (only uses future information)
+
+**Central Difference (v2)**:
+```python
+# For interior points
+ds/dt[i] = (s[i+1] - s[i-1]) / (2 * (t[i+1] - t[i-1]))
+```
+- **Pros**: More accurate (O(h²) vs O(h) error), symmetric (uses both past and future)
+- **Cons**: Requires both previous and next points (not applicable at boundaries)
+
+**Boundary Handling**:
+- First point: Forward difference `(s[1] - s[0]) / (t[1] - t[0])`
+- Last point: Backward difference `(s[N-1] - s[N-2]) / (t[N-1] - t[N-2])`
+- Interior points: Central difference
+
+### Enhanced Features
+
+1. **Component Scaling for Physics Residuals**:
+   - `physics_scale`: Scales physics residuals by component type
+     - Default: `pos: 1.0, vel: 1.0, quat: 0.1, ang: 0.2, mass: 1e-3`
+   - **Purpose**: Balances physics loss contributions across different state components
+
+2. **Reweighted Physics Terms**:
+   - `physics_groups`: Weights for physics loss groups
+     - Default: `pos: 1.0, vel: 1.0, quat: 0.2, ang: 0.5, mass: 1.0`
+   - **Purpose**: Fine-tune physics loss weighting for better convergence
+
+### Rationale
+- **More Accurate Derivatives**: Central difference has O(h²) truncation error vs O(h) for forward difference
+- **Smoother Gradients**: Symmetric method reduces numerical noise in derivative computation
+- **Better Physics Residuals**: More accurate derivatives lead to more accurate physics residual computation
+- **Component Balance**: Scaling and reweighting help balance physics loss contributions
+
+### Configuration
+
+```yaml
+loss:
+  type: PINNLossV2  # Use v2 loss with central difference
+  lambda_data: 1.0
+  lambda_phys: 0.1
+  lambda_phys_final: 1.0
+  # ... (all D1.5.3 loss parameters preserved)
+  
+  # V2 specific: Component scaling for physics residuals
+  physics_scale:
+    pos: 1.0
+    vel: 1.0
+    quat: 1.0
+    ang: 1.0
+    mass: 1.0
+  
+  # V2 specific: Reweighted physics terms
+  physics_groups:
+    pos: 1.0
+    vel: 1.0
+    quat: 1.0
+    ang: 1.0
+    mass: 1.0
+```
+
+### Implementation Status
+- ✅ Code integrated and tested
+- ✅ `exp17_05_12_direction_d154_central_diff_scaled` completed
+- ✅ Central difference handles non-uniform time grids
+- ✅ Boundary handling implemented (forward/backward difference at boundaries)
+
+### Results
+
+**exp17 (2025-12-05) - Central Difference Scaled**:
+- **Total RMSE**: **0.254**
+- **Translation RMSE**: 0.330
+- **Rotation RMSE**: 0.189
+- **Mass RMSE**: 0.020
+- **Quaternion Norm**: 1.0 (perfect)
+
+**Key Observations:**
+- ⚠️ Higher RMSE than D1.5.3 (0.254 vs 0.198)
+- ✅ Perfect quaternion normalization maintained
+- ⚠️ Rotation RMSE increased (0.189 vs 0.132 in D1.5.3)
+- ⚠️ Translation RMSE increased (0.330 vs 0.266 in D1.5.3)
+- **Note**: This may indicate that central difference requires different loss weight tuning, or that the current configuration needs adjustment
+
+### Notes
+- **Architecture Unchanged**: Same model as D1.5.3, only loss function changed
+- **Derivative Method**: Central difference is more accurate but may require different hyperparameters
+- **Component Scaling**: New feature allows fine-tuning physics loss contributions
+- **Future Work**: May need to tune physics_scale and physics_groups for optimal performance
+- **Non-Uniform Grids**: Central difference implementation handles variable time steps correctly
 
 ---
 

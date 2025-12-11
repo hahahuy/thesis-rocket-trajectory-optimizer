@@ -15,6 +15,7 @@
      - 7.7. [Direction D1.5.1: Position-Velocity Consistency](#77-direction-d151-position-velocity-consistency)
      - 7.8. [Direction D1.5.2: Horizontal Motion Suppression](#78-direction-d152-horizontal-motion-suppression)
      - 7.9. [Direction D1.5.3: V2 Dataloader and Loss Function](#79-direction-d153-v2-dataloader-and-loss-function)
+     - 7.10. [Direction D1.5.4: Central Difference Derivative Method](#710-direction-d154-central-difference-derivative-method)
    - 8. [Direction AN: Shared Stem + Mission Branches + Physics Residuals](#8-direction-an-shared-stem--mission-branches--physics-residuals)
 
 ---
@@ -1906,7 +1907,7 @@ Dataset (HDF5) → DataLoader
 
 ### 7.9 Direction D1.5 Series Summary
 
-**Evolution Path**: D → D1 → D1.5 → D1.5.1 → D1.5.2 → D1.5.3
+**Evolution Path**: D → D1 → D1.5 → D1.5.1 → D1.5.2 → D1.5.3 → D1.5.4
 
 | Direction | Key Innovation | Total RMSE | Best Component |
 |-----------|----------------|------------|----------------|
@@ -1916,6 +1917,7 @@ Dataset (HDF5) → DataLoader
 | **D1.5.1** | Position-velocity consistency | 0.200 | Rotation (0.131) |
 | **D1.5.2** | Horizontal suppression | **0.198** ✅ | Mass (0.015) |
 | **D1.5.3** | V2 dataloader + v2 loss | 0.198 | Mass (0.015) |
+| **D1.5.4** | Central difference derivative | 0.254 | Mass (0.020) |
 
 **Key Achievements:**
 1. **Best Overall RMSE**: 0.198 (D1.5.2 exp11) - 34% better than Direction D baseline
@@ -2014,6 +2016,98 @@ Dataset (HDF5 v2) → RocketDatasetV2
 - ✅ Excellent mass prediction (0.015 RMSE)
 - ✅ Perfect quaternion normalization
 - ⚠️ V2 features currently unused (future: v2 model versions will use them)
+
+---
+
+### 7.10 Direction D1.5.4: Central Difference Derivative Method
+
+**Date**: 2025-12-05  
+**Experiment**: exp17_05_12_direction_d154_central_diff_scaled  
+**Total RMSE**: **0.254**
+
+#### 7.10.1 What Changed Compared to Direction D1.5.3
+
+**Key Changes:**
+
+1. **Derivative Computation Method**:
+   - **Previous (D1.5.3)**: Forward difference `ds/dt = (s(t+1) - s(t)) / dt`
+   - **D1.5.4**: Central difference `ds/dt = (s(t+1) - s(t-1)) / (2*dt)`
+   - **Rationale**: Central difference provides smoother and more accurate derivatives (O(h²) vs O(h) truncation error)
+
+2. **New Loss Function Class**:
+   - Uses `PINNLossV2` instead of `PINNLoss`
+   - Overrides `compute_derivative()` method to use `central_difference()`
+   - Handles non-uniform time grids correctly
+
+3. **Component Scaling for Physics Residuals**:
+   - `physics_scale`: Scales physics residuals by component type
+     - Default: `pos: 1.0, vel: 1.0, quat: 0.1, ang: 0.2, mass: 1e-3`
+   - **Purpose**: Balances physics loss contributions across different state components
+
+4. **Reweighted Physics Terms**:
+   - `physics_groups`: Weights for physics loss groups
+     - Default: `pos: 1.0, vel: 1.0, quat: 0.2, ang: 0.5, mass: 1.0`
+   - **Purpose**: Fine-tune physics loss weighting for better convergence
+
+**Preserved Components:**
+- Same architecture as D1.5.3 (DirectionDPINN_D15)
+- Same structural constraints (mass monotonicity, 6D rotation)
+- Same phase schedule structure (55% data-only, 45% physics ramp)
+- All D1.5.3 loss parameters preserved
+
+#### 7.10.2 Derivative Method Comparison
+
+**Forward Difference (v1, D1.5.3)**:
+```python
+# For interior points
+ds/dt[i] = (s[i+1] - s[i]) / (t[i+1] - t[i])
+```
+- **Pros**: Simple, only needs next point
+- **Cons**: Less accurate (O(h) truncation error), asymmetric (only uses future information)
+
+**Central Difference (v2, D1.5.4)**:
+```python
+# For interior points
+ds/dt[i] = (s[i+1] - s[i-1]) / (2 * (t[i+1] - t[i-1]))
+```
+- **Pros**: More accurate (O(h²) truncation error), symmetric (uses both past and future)
+- **Cons**: Requires both previous and next points (not applicable at boundaries)
+
+**Boundary Handling**:
+- **First point**: Forward difference `(s[1] - s[0]) / (t[1] - t[0])`
+- **Last point**: Backward difference `(s[N-1] - s[N-2]) / (t[N-1] - t[N-2])`
+- **Interior points**: Central difference
+
+#### 7.10.3 Why It Would Be Better
+
+1. **More Accurate Derivatives**: Central difference has O(h²) truncation error vs O(h) for forward difference
+2. **Smoother Gradients**: Symmetric method reduces numerical noise in derivative computation
+3. **Better Physics Residuals**: More accurate derivatives lead to more accurate physics residual computation
+4. **Component Balance**: Scaling and reweighting help balance physics loss contributions
+5. **Non-Uniform Grids**: Central difference implementation handles variable time steps correctly
+
+#### 7.10.4 Results (exp17)
+
+| Metric | Value |
+|--------|-------|
+| **Total RMSE** | **0.254** |
+| **Translation RMSE** | 0.330 |
+| **Rotation RMSE** | 0.189 |
+| **Mass RMSE** | 0.020 |
+| **Quaternion Norm** | 1.0 (perfect) |
+
+**Key Observations:**
+- ⚠️ Higher RMSE than D1.5.3 (0.254 vs 0.198)
+- ✅ Perfect quaternion normalization maintained
+- ⚠️ Rotation RMSE increased (0.189 vs 0.132 in D1.5.3)
+- ⚠️ Translation RMSE increased (0.330 vs 0.266 in D1.5.3)
+- **Note**: This may indicate that central difference requires different loss weight tuning, or that the current configuration needs adjustment
+
+**Potential Reasons for Higher RMSE:**
+1. **Hyperparameter Sensitivity**: Central difference may require different loss weights
+2. **Physics Scale Tuning**: Default physics_scale values may not be optimal
+3. **Training Dynamics**: More accurate derivatives may change training dynamics, requiring different schedules
+4. **Component Balance**: Physics groups may need rebalancing for central difference
 
 ---
 

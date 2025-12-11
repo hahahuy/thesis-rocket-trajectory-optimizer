@@ -523,4 +523,202 @@ class DirectionANPINN_AN1(nn.Module):
         return state
 
 
+class DirectionANPINN_AN2(nn.Module):
+    """
+    Direction AN2: Additive variant to keep AN/AN1 intact.
+
+    - Supports both v1-style (t, context) and optional v2 inputs (T_mag, q_dyn)
+      when use_v2_inputs=True.
+    - Adds a residual refinement stack after the fused input when v2 inputs are used.
+    - Reuses mission branches and physics residual layer; no behavior changes to AN/AN1.
+    """
+
+    requires_initial_state = False
+
+    def __init__(
+        self,
+        context_dim: int,
+        fourier_features: int = 8,
+        stem_hidden_dim: int = 128,
+        stem_layers: int = 4,
+        activation: str = "tanh",
+        layer_norm: bool = True,
+        translation_branch_dims: Optional[list] = None,
+        rotation_branch_dims: Optional[list] = None,
+        mass_branch_dims: Optional[list] = None,
+        dropout: float = 0.0,
+        physics_params: Optional[dict] = None,
+        physics_scales: Optional[dict] = None,
+        use_v2_inputs: bool = False,
+        extra_embedding_dim: int = 16,
+        context_embedding_dim: int = 32,
+    ) -> None:
+        super().__init__()
+
+        self.use_v2_inputs = use_v2_inputs
+
+        if use_v2_inputs:
+            # Fuse t + context + T_mag + q_dyn
+            self.input_block = InputBlockV2(
+                context_dim=context_dim,
+                fourier_features=fourier_features,
+                context_embedding_dim=context_embedding_dim,
+                extra_embedding_dim=extra_embedding_dim,
+                output_dim=stem_hidden_dim,
+                activation=activation,
+                dropout=dropout,
+            )
+        else:
+            # V1-style stem (same as AN)
+            self.stem = ANSharedStem(
+                context_dim=context_dim,
+                fourier_features=fourier_features,
+                hidden_dim=stem_hidden_dim,
+                n_layers=stem_layers,
+                activation=activation,
+                use_layer_norm=layer_norm,
+            )
+
+        # Optional residual refinement after fused inputs (only for v2 path)
+        self.stem_layers = stem_layers
+        if stem_layers > 0 and use_v2_inputs:
+            layers = []
+            for i in range(stem_layers):
+                layers.append(nn.Linear(stem_hidden_dim, stem_hidden_dim))
+                if activation == "tanh":
+                    layers.append(nn.Tanh())
+                elif activation == "gelu":
+                    layers.append(nn.GELU())
+                elif activation == "relu":
+                    layers.append(nn.ReLU())
+                else:
+                    raise ValueError(f"Unknown activation: {activation}")
+                if dropout > 0.0:
+                    layers.append(nn.Dropout(dropout))
+            if layer_norm:
+                layers.append(nn.LayerNorm(stem_hidden_dim))
+            self.stem_mlp = nn.ModuleList(layers)
+        else:
+            self.stem_mlp = None
+
+        # Mission branches (shared design)
+        self.translation_branch = TranslationBranch(
+            hidden_dim=stem_hidden_dim,
+            branch_dims=translation_branch_dims or [128, 128],
+            activation=activation,
+            dropout=dropout,
+        )
+        self.rotation_branch = RotationBranch(
+            hidden_dim=stem_hidden_dim,
+            branch_dims=rotation_branch_dims or [256, 256],
+            activation=activation,
+            dropout=dropout,
+        )
+        self.mass_branch = MassBranch(
+            hidden_dim=stem_hidden_dim,
+            branch_dims=mass_branch_dims or [64],
+            activation=activation,
+            dropout=dropout,
+        )
+
+        # Physics residual layer
+        self.physics_layer = PhysicsResidualLayer(
+            physics_params=physics_params,
+            scales=physics_scales,
+        )
+
+    def _ensure_batched(
+        self, t: torch.Tensor, context: torch.Tensor
+    ) -> Tuple[torch.Tensor, torch.Tensor, bool]:
+        t_was_unbatched = False
+
+        if t.dim() == 1:
+            t = t.unsqueeze(-1)
+        if t.dim() == 2:
+            t = t.unsqueeze(0)
+            t_was_unbatched = True
+
+        if context.dim() == 1:
+            context = context.unsqueeze(0)
+
+        return t, context, t_was_unbatched
+
+    def forward(
+        self,
+        t: torch.Tensor,
+        context: torch.Tensor,
+        control: Optional[torch.Tensor] = None,
+        T_mag: Optional[torch.Tensor] = None,
+        q_dyn: Optional[torch.Tensor] = None,
+    ) -> Tuple[torch.Tensor, PhysicsResiduals]:
+        """
+        Forward pass with optional v2 features.
+        """
+        t, context, was_unbatched = self._ensure_batched(t, context)
+
+        if self.use_v2_inputs:
+            if T_mag is None or q_dyn is None:
+                raise ValueError("DirectionANPINN_AN2 with use_v2_inputs=True expects T_mag and q_dyn")
+            if T_mag.dim() == 1:
+                T_mag = T_mag.unsqueeze(0).unsqueeze(-1)
+            elif T_mag.dim() == 2:
+                T_mag = T_mag.unsqueeze(-1)
+            if q_dyn.dim() == 1:
+                q_dyn = q_dyn.unsqueeze(0).unsqueeze(-1)
+            elif q_dyn.dim() == 2:
+                q_dyn = q_dyn.unsqueeze(-1)
+            latent = self.input_block(t, context, T_mag, q_dyn)
+
+            if self.stem_mlp is not None:
+                h = latent
+                n_pairs = self.stem_layers
+                # Process linear+activation pairs
+                for i in range(0, n_pairs * 2, 2):
+                    lin = self.stem_mlp[i]
+                    act = self.stem_mlp[i + 1]
+                    h_new = act(lin(h))
+                    h = h + h_new
+                # Optional LayerNorm appended at end
+                if len(self.stem_mlp) > n_pairs * 2:
+                    norm = self.stem_mlp[-1]
+                    h = norm(h)
+                latent = h
+        else:
+            latent = self.stem(t, context)
+
+        # Ensure batched layout for branches and physics
+        if latent.dim() == 2:
+            latent = latent.unsqueeze(0)
+            t = t.unsqueeze(0) if t.dim() == 2 else t
+            context = context.unsqueeze(0) if context.dim() == 2 else context
+
+        # Mission branches
+        trans_out = self.translation_branch(latent)
+        rot_out = self.rotation_branch(latent)
+        mass_out = self.mass_branch(latent)
+
+        q_pred = normalize_quaternion(rot_out[..., :4])
+        w_pred = rot_out[..., 4:]
+        x_pred = trans_out[..., :3]
+        v_pred = trans_out[..., 3:]
+
+        state = torch.cat([x_pred, v_pred, q_pred, w_pred, mass_out], dim=-1)
+
+        residuals = self.physics_layer(t, state, control=control)
+
+        if was_unbatched:
+            state = state.squeeze(0)
+
+        return state, residuals
+
+    def predict_trajectory(
+        self,
+        t: torch.Tensor,
+        context: torch.Tensor,
+        control: Optional[torch.Tensor] = None,
+        T_mag: Optional[torch.Tensor] = None,
+        q_dyn: Optional[torch.Tensor] = None,
+    ) -> torch.Tensor:
+        state, _ = self.forward(t, context, control, T_mag, q_dyn)
+        return state
 

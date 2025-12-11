@@ -25,6 +25,7 @@ from src.train.callbacks import (
     create_scheduler
 )
 from src.train.losses import PINNLoss
+from src.train.losses_v2 import PINNLossV2
 from src.utils.loaders import create_dataloaders
 from src.utils.loaders_v2 import create_dataloaders_v2
 from src.utils.reproducibility import set_seed
@@ -708,31 +709,51 @@ def main():
     print(f"Model parameters: {sum(p.numel() for p in model.parameters()):,}")
     
     # Create loss function with enhanced parameters
+    # Support both v1 (PINNLoss) and v2 (PINNLossV2) loss types
+    loss_type = loss_cfg.get("type", "PINNLoss").strip()
     component_weights = loss_cfg.get("component_weights", None)
-    loss_fn = PINNLoss(
-        lambda_data=safe_float(loss_cfg.get("lambda_data"), 1.0),
-        lambda_phys=safe_float(loss_cfg.get("lambda_phys"), 0.1),
-        lambda_bc=safe_float(loss_cfg.get("lambda_bc"), 1.0),
-        physics_params=physics_params,
-        scales=scales,
-        component_weights=component_weights,
-        lambda_quat_norm=safe_float(loss_cfg.get("lambda_quat_norm"), 0.0),
-        lambda_mass_flow=safe_float(loss_cfg.get("lambda_mass_flow"), 0.0),
-        lambda_translation=safe_float(loss_cfg.get("lambda_translation"), 1.0),
-        lambda_rotation=safe_float(loss_cfg.get("lambda_rotation"), 1.0),
-        lambda_mass=safe_float(loss_cfg.get("lambda_mass"), 1.0),
-        lambda_mass_residual=safe_float(loss_cfg.get("lambda_mass_residual"), 0.0),
-        lambda_vz_residual=safe_float(loss_cfg.get("lambda_vz_residual"), 0.0),
-        lambda_vxy_residual=safe_float(loss_cfg.get("lambda_vxy_residual"), 0.0),
-        lambda_smooth_z=safe_float(loss_cfg.get("lambda_smooth_z"), 0.0),
-        lambda_smooth_vz=safe_float(loss_cfg.get("lambda_smooth_vz"), 0.0),
-        lambda_pos_vel=safe_float(loss_cfg.get("lambda_pos_vel"), 0.0),
-        lambda_smooth_pos=safe_float(loss_cfg.get("lambda_smooth_pos"), 0.0),
-        lambda_zero_vxy=safe_float(loss_cfg.get("lambda_zero_vxy"), 0.0),
-        lambda_zero_axy=safe_float(loss_cfg.get("lambda_zero_axy"), 0.0),
-        lambda_hacc=safe_float(loss_cfg.get("lambda_hacc"), 0.0),
-        lambda_xy_zero=safe_float(loss_cfg.get("lambda_xy_zero"), 0.0),
-    )
+    
+    loss_params = {
+        "lambda_data": safe_float(loss_cfg.get("lambda_data"), 1.0),
+        "lambda_phys": safe_float(loss_cfg.get("lambda_phys"), 0.1),
+        "lambda_bc": safe_float(loss_cfg.get("lambda_bc"), 1.0),
+        "physics_params": physics_params,
+        "scales": scales,
+        "component_weights": component_weights,
+        "lambda_quat_norm": safe_float(loss_cfg.get("lambda_quat_norm"), 0.0),
+        "lambda_mass_flow": safe_float(loss_cfg.get("lambda_mass_flow"), 0.0),
+        "lambda_translation": safe_float(loss_cfg.get("lambda_translation"), 1.0),
+        "lambda_rotation": safe_float(loss_cfg.get("lambda_rotation"), 1.0),
+        "lambda_mass": safe_float(loss_cfg.get("lambda_mass"), 1.0),
+        "lambda_mass_residual": safe_float(loss_cfg.get("lambda_mass_residual"), 0.0),
+        "lambda_vz_residual": safe_float(loss_cfg.get("lambda_vz_residual"), 0.0),
+        "lambda_vxy_residual": safe_float(loss_cfg.get("lambda_vxy_residual"), 0.0),
+        "lambda_smooth_z": safe_float(loss_cfg.get("lambda_smooth_z"), 0.0),
+        "lambda_smooth_vz": safe_float(loss_cfg.get("lambda_smooth_vz"), 0.0),
+        "lambda_pos_vel": safe_float(loss_cfg.get("lambda_pos_vel"), 0.0),
+        "lambda_smooth_pos": safe_float(loss_cfg.get("lambda_smooth_pos"), 0.0),
+        "lambda_zero_vxy": safe_float(loss_cfg.get("lambda_zero_vxy"), 0.0),
+        "lambda_zero_axy": safe_float(loss_cfg.get("lambda_zero_axy"), 0.0),
+        "lambda_hacc": safe_float(loss_cfg.get("lambda_hacc"), 0.0),
+        "lambda_xy_zero": safe_float(loss_cfg.get("lambda_xy_zero"), 0.0),
+    }
+    
+    if loss_type == "PINNLossV2":
+        # Add v2-specific parameters
+        loss_params["physics_scale"] = loss_cfg.get("physics_scale", None)
+        loss_params["physics_groups"] = loss_cfg.get("physics_groups", None)
+        loss_fn = PINNLossV2(**loss_params)
+        print("Using PINNLossV2 (central difference derivative)")
+        if loss_params["physics_scale"]:
+            print(f"  Physics scales: {loss_params['physics_scale']}")
+        if loss_params["physics_groups"]:
+            print(f"  Physics groups: {loss_params['physics_groups']}")
+    else:
+        loss_fn = PINNLoss(**loss_params)
+        if loss_type != "PINNLoss":
+            print(f"Warning: Unknown loss type '{loss_type}', defaulting to PINNLoss")
+        else:
+            print("Using PINNLoss (forward difference derivative)")
     
     # Create optimizer
     lr = safe_float(train_cfg.get("learning_rate"), 1e-3)
