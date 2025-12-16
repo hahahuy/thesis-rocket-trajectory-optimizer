@@ -26,6 +26,41 @@ planned evolution of the overall methodology.
 \section{Physical Model}
 \label{sec:physical-model}
 
+\subsection{Notation}
+\label{subsec:notation}
+
+\begin{table}[h]
+\centering
+\caption{Notation and typical parameter ranges}
+\label{tab:notation}
+\begin{tabular}{llll}
+\toprule
+Symbol & Description & Units & Typical Range \\
+\midrule
+\(\mathbf{r}_\mathrm{i}\) & Position (inertial) & m & -- \\
+\(\mathbf{v}_\mathrm{i}\) & Velocity (inertial) & m/s & 0--500 \\
+\(\mathbf{q}\) & Quaternion (attitude) & -- & unit norm \\
+\(\boldsymbol{\omega}_\mathrm{b}\) & Angular velocity (body) & rad/s & -- \\
+\(m\) & Mass & kg & 35--65 \\
+\(T\) & Thrust magnitude & N & 0--5000 \\
+\(\theta_\mathrm{g}, \phi_\mathrm{g}\) & Gimbal angles & rad & \(\pm 0.1745\) \\
+\(\delta\) & Control surface deflection & rad & \(\pm 0.1745\) \\
+\(m_0\) & Initial mass & kg & 45--65 \\
+\(I_\mathrm{sp}\) & Specific impulse & s & 220--280 \\
+\(C_\mathrm{D}\) & Drag coefficient & -- & 0.25--0.45 \\
+\(C_{\mathrm{L}\alpha}\) & Lift-curve slope & rad\(^{-1}\) & 2.5--4.5 \\
+\(C_{\mathrm{m}\alpha}\) & Pitch-moment coefficient & rad\(^{-1}\) & -1.2--(-0.4) \\
+\(T_\mathrm{max}\) & Maximum thrust & N & 3000--5000 \\
+\(q_\mathrm{dyn,max}\) & Max dynamic pressure & Pa & 40,000 \\
+\(n_\mathrm{max}\) & Max load factor & g & 5.0 \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+Table~\ref{tab:notation} summarizes the key notation used throughout this
+document, including state and control variables, physical parameters, and
+their typical ranges or units.
+
 \subsection{State, Control, and Reference Frames}
 
 The rocket is modelled as a rigid body with full 6-DOF dynamics. The state
@@ -74,6 +109,41 @@ The body-to-inertial rotation matrix \(R_{\mathrm{b}\to\mathrm{i}}(\mathbf{q})\)
 is obtained from the quaternion \(\mathbf{q}\). Its transpose
 \(R_{\mathrm{i}\to\mathrm{b}} = R_{\mathrm{b}\to\mathrm{i}}^\top\) transforms
 vectors from the inertial frame to the body frame.
+
+\paragraph{Physical scale and typical values.}
+The model is parameterised for small sounding rockets with initial masses
+ranging from 45 to 65 kg, maximum thrusts of 3000--5000 N, and specific
+impulses of 220--280 s. Typical trajectories reach apogees of 30--42 km
+over 30-second flight durations, with maximum velocities of approximately
+300--500 m/s. The aerodynamic coefficients vary within realistic ranges:
+drag coefficient \(C_\mathrm{D} \in [0.25, 0.45]\), lift-curve slope
+\(C_{\mathrm{L}\alpha} \in [2.5, 4.5]\) rad\(^{-1}\), and pitch-moment
+coefficient \(C_{\mathrm{m}\alpha} \in [-1.2, -0.4]\) rad\(^{-1}\). Path
+constraints enforce maximum dynamic pressure of 40,000 Pa and maximum load
+factor of 5 g, consistent with structural limits for small launch vehicles.
+Typical propellant consumption ranges from 10 to 30 kg over the flight
+duration (corresponding to initial masses of 45--65 kg and a dry mass of
+35 kg), with gimbal angles remaining small (less than 10°) for
+near-vertical ascent trajectories.
+
+\paragraph{Control representation across the pipeline.}
+Different parts of the implementation use different control representations
+for numerical and storage efficiency. The CasADi-based optimal control solver
+and PyTorch PINN dynamics use the gimbal-angle parameterisation
+\(u = [T, \theta_\mathrm{g}, \phi_\mathrm{g}, \delta]^\top\) described above.
+The C++ truth integrator uses a unit-vector representation
+\(\tilde{u} = [T, u_{\mathrm{T},x}, u_{\mathrm{T},y}, u_{\mathrm{T},z}, \delta]^\top\),
+where the thrust direction components are related to the gimbal angles by
+\[
+  u_{\mathrm{T},x} = \cos\theta_\mathrm{g}\cos\phi_\mathrm{g}, \qquad
+  u_{\mathrm{T},y} = \sin\phi_\mathrm{g}, \qquad
+  u_{\mathrm{T},z} = \sin\theta_\mathrm{g}\cos\phi_\mathrm{g}.
+\]
+Processed datasets store control as \([T, u_{\mathrm{T},x}, u_{\mathrm{T},y}, u_{\mathrm{T},z}]\)
+(4-D format, omitting \(\delta\) which is typically zero). The control surface
+deflection \(\delta\) is optimised in the CasADi formulation and included in the
+C++ dynamics when non-zero, but is not used in PINN training, where a zero-control
+assumption is employed (see Section~\ref{sec:methodology}).
 
 \subsection{Forces, Moments, and Mass Flow}
 
@@ -192,9 +262,26 @@ single-parameter exponential model; detailed thermodynamic and compositional
 effects are neglected. Wind is configurable in the C++ truth integrator but is
 set to zero in the optimisation and PINN configurations.
 
-These simplifications yield a model that is rich enough to capture the key
-couplings between translation, rotation, aerodynamics, and thrust, while
-remaining tractable for large-scale optimal control and data generation.
+\paragraph{Motivation for simplifications.}
+Each simplification is chosen to balance fidelity with computational
+tractability while maintaining accuracy for the target application. The
+spherical Earth assumption is acceptable for altitudes below 100 km (typical
+trajectories reach 30--42 km), where gravitational variations are less than
+1\%. Constant gravity in the optimization formulation reduces computational
+cost while maintaining accuracy for short-duration flights; the error
+introduced is negligible compared to other uncertainties. The exponential
+atmosphere model captures over 90\% of the density variation relevant to
+ascent trajectories; more complex models (e.g., US Standard Atmosphere) add
+minimal value for the ascent phase while significantly increasing computational
+complexity. The single-stage rigid-body assumption focuses the model on the
+ascent phase, where staging events are not present; flexible modes are
+negligible for small rockets with high structural stiffness (typical natural
+frequencies exceed 100 Hz, well above the trajectory dynamics). Wind effects
+are neglected in optimization to reduce parameter space dimensionality, but
+the framework supports wind models for future extensions. These simplifications
+yield a model that is rich enough to capture the key couplings between
+translation, rotation, aerodynamics, and thrust, while remaining tractable for
+large-scale optimal control and data generation.
 
 \section{Numerical Solution and Optimal Control Formulation}
 \label{sec:numerical-solution}
@@ -310,12 +397,34 @@ cases are stored as individual HDF5 files containing time grids, full 14-D
 state trajectories, control histories, monitor signals (e.g.\ dynamic pressure
 and load factor), and rich metadata including physical parameters, solver
 statistics, and configuration hashes. These raw cases are then aggregated into
-processed split files (train/validation/test) in nondimensional form. Each
-processed dataset exposes a time grid, a context vector encoding key physical
-and environmental parameters (masses, thrust limits, aerodynamic coefficients,
-inertia properties, atmospheric scales, wind settings, and constraint limits),
-and normalised state targets; an extended ``v2'' format additionally provides
-time series of thrust magnitude and dynamic pressure as explicit input features.
+processed split files (train/validation/test) in nondimensional form. The
+processed datasets contain approximately 120 training cases, 20 validation
+cases, and 20 test cases. Each trajectory is discretised on a uniform time
+grid with \(N = 1501\) points, corresponding to a 30-second flight duration
+sampled at 50\,Hz. Each processed dataset exposes a time grid, a context
+vector of dimension 7 encoding key physical and environmental parameters
+(initial mass \(m_0\), specific impulse \(I_\mathrm{sp}\), drag coefficient
+\(C_\mathrm{D}\), lift-curve slope \(C_{\mathrm{L}\alpha}\), pitch-moment
+coefficient \(C_{\mathrm{m}\alpha}\), maximum thrust \(T_\mathrm{max}\), and
+wind magnitude), and normalised state targets; an extended ``v2'' format
+additionally provides time series of thrust magnitude and dynamic pressure
+as explicit input features.
+
+\paragraph{Nondimensionalization and scaling.}
+All state and control variables are nondimensionalized using physics-aware
+reference scales to improve numerical conditioning and enable scale-invariant
+learning. The reference scales are chosen to yield quantities of order unity:
+length scale \(L_\mathrm{ref} = 10,000\) m (characteristic altitude), velocity
+scale \(V_\mathrm{ref} = 313\) m/s (approximately \(\sqrt{g_0 L_\mathrm{ref}}\)),
+time scale \(T_\mathrm{ref} = 31.62\) s (approximately \(L_\mathrm{ref}/V_\mathrm{ref}\)),
+mass scale \(M_\mathrm{ref} = 50\) kg (nominal wet mass), and force scale
+\(F_\mathrm{ref} = 490\) N (approximately \(M_\mathrm{ref} g_0\)). This
+nondimensionalization ensures that all state components are typically in the
+range \([0.1, 10]\), which improves gradient flow during neural network
+training and reduces numerical errors in the optimization solver. The scaling
+also makes the model scale-invariant: trajectories for different-sized rockets
+can be learned using the same architecture, with physical scale encoded in the
+context vector.
 
 On the modelling side, several families of PINN and hybrid architectures have
 been implemented in PyTorch. Common building blocks include Fourier feature
@@ -336,13 +445,13 @@ loss to promote physically consistent predictions.
 
 Among the available architectures, the ``Direction AN'' model is a canonical
 example of how the project combines learned representations with physics-based
-regularisation. Its structure is organised into three stages. A shared stem
-first embeds the normalised time and context: time is expanded by Fourier
-features, while the context vector is passed through a small encoder and then
-concatenated with the time embedding. This combined input is processed by a
-residual multilayer perceptron with skip connections and optional layer
-normalisation, yielding a latent feature sequence \(z(t, c)\) of fixed
-dimension along the trajectory.
+regularisation. Its structure is organised into three stages (see
+Figure~\ref{fig:direction_an_architecture}). A shared stem first embeds the
+normalised time and context: time is expanded by Fourier features, while the
+context vector is passed through a small encoder and then concatenated with the
+time embedding. This combined input is processed by a residual multilayer
+perceptron with skip connections and optional layer normalisation, yielding a
+latent feature sequence \(z(t, c)\) of fixed dimension along the trajectory.
 
 On top of this shared latent representation, three ``mission branches''
 specialise to different parts of the 14-D state. A translation branch maps
@@ -356,48 +465,158 @@ the plain stem input with a richer block that also ingests time series of
 thrust magnitude and dynamic pressure, fusing \((t, c, T_\mathrm{mag}(t),
 q_\mathrm{dyn}(t))\) into the shared latent representation.
 
+\paragraph{Architecture design rationale.}
+The Direction AN architecture is designed to leverage the physical structure
+of the 6-DOF dynamics while enabling efficient learning. The shared stem
+captures common temporal and physical dependencies that affect all state
+components (e.g., altitude-dependent atmospheric effects, time-varying mass).
+Separate mission branches decouple the learning of translation, rotation, and
+mass dynamics, which have different physical characteristics: translation
+follows Newton's laws with aerodynamic coupling, rotation involves quaternion
+kinematics and moment dynamics, and mass follows a simple depletion law. This
+decoupling allows each branch to specialize while sharing common features
+through the stem. The explicit quaternion renormalisation in the rotation
+branch ensures valid rotations (unit quaternions) by construction, avoiding
+the need for post-processing or soft constraints. The physics residual layer
+directly enforces the 6-DOF dynamics equations, ensuring that predictions
+satisfy the underlying physics even when data is sparse or noisy. This
+hybrid approach combines the expressiveness of neural networks with the
+rigor of physics-based constraints.
+
+\begin{figure}[h]
+\centering
+\includegraphics[width=0.8\textwidth]{figures/direction_an_architecture.pdf}
+\caption{Architecture of the Direction AN model. The shared stem processes
+time and context inputs to produce a latent representation \(z(t, c)\). Three
+specialized branches (translation, rotation, mass) map this latent space to
+the corresponding state components. The physics residual layer computes
+dynamics residuals to enforce physical consistency.}
+\label{fig:direction_an_architecture}
+\end{figure}
+
 The training objective for Direction AN follows a physics-informed pattern.
 Given a reference trajectory \(x^\star(t_k)\) on a uniform grid
 \(\{t_k\}_{k=0}^{N}\), the total loss is a weighted sum
 \[
+  \begin{split}
   L
-  = \lambda_\mathrm{data} L_\mathrm{data}
+  &= \lambda_\mathrm{data} L_\mathrm{data}
   + \lambda_\mathrm{phys} L_\mathrm{phys}
   + \lambda_\mathrm{bc} L_\mathrm{bc}
   + \lambda_\mathrm{quat} L_\mathrm{quat}
   + \lambda_\mathrm{mass} L_\mathrm{mass}
+  + \lambda_\mathrm{mass,res} L_\mathrm{mass,res} \\
+  &\quad + \lambda_\mathrm{vz,res} L_\mathrm{vz,res}
+  + \lambda_\mathrm{vxy,res} L_\mathrm{vxy,res}
+  + \lambda_\mathrm{smooth,z} L_\mathrm{smooth,z}
+  + \lambda_\mathrm{smooth,vz} L_\mathrm{smooth,vz} \\
+  &\quad + \lambda_\mathrm{pos,vel} L_\mathrm{pos,vel}
+  + \lambda_\mathrm{smooth,pos} L_\mathrm{smooth,pos}
+  + \lambda_\mathrm{zero,vxy} L_\mathrm{zero,vxy}
+  + \lambda_\mathrm{zero,axy} L_\mathrm{zero,axy} \\
+  &\quad + \lambda_\mathrm{hacc} L_\mathrm{hacc}
+  + \lambda_\mathrm{xy,zero} L_\mathrm{xy,zero}
   + \cdots ,
+  \end{split}
 \]
-where the ellipsis denotes optional soft constraints and smoothing terms.
-The data term \(L_\mathrm{data}\) is a component-weighted mean-squared error
-between predicted and true states, with separate group weights for translation,
-rotation, and mass so that altitude, vertical velocity, and attitude can be
-emphasised. The physics term \(L_\mathrm{phys}\) penalises violations of the
-continuous dynamics by comparing a finite-difference estimate of the time
-derivative \(\dot{x}_\theta(t_k)\) to the right-hand side
+where the additional terms beyond the core physics loss represent soft
+constraints and smoothing regularisers. The data term \(L_\mathrm{data}\) is
+a component-weighted mean-squared error between predicted and true states,
+with separate group weights for translation, rotation, and mass so that
+altitude, vertical velocity, and attitude can be emphasised. The physics term
+\(L_\mathrm{phys}\) penalises violations of the continuous dynamics by
+comparing a finite-difference estimate of the time derivative
+\(\dot{x}_\theta(t_k)\) to the right-hand side
 \(f(x_\theta(t_k), u_k; p)\) of the 6-DOF model implemented in PyTorch,
 \[
   L_\mathrm{phys}
   = \frac{1}{N} \sum_{k=0}^{N}
     \bigl\|
       \dot{x}_\theta(t_k) - f(x_\theta(t_k), u_k; p)
-    \bigr\|^2 ,
+    \bigr\|^2 .
 \]
-using either known controls or, in the current dataset, a zero-control
-surrogate consistent with the reference trajectories.
+The control \(u_k\) in the physics loss is set to zero
+(\(u_k = [0, 0, 0, 0]^\top\)), reflecting the intentional design choice that
+PINNs learn trajectories without explicit control input; the control is
+implicitly encoded in the state trajectory itself. This zero-control assumption
+is consistent with the processed dataset format, which does not include control
+trajectories, and enables the model to learn the mapping from initial
+conditions and physical parameters directly to state evolution.
 
 A boundary term \(L_\mathrm{bc}\) enforces agreement between predicted and true
 initial conditions, while regularisers such as the quaternion norm penalty
 \(L_\mathrm{quat}\) and a mass-flow consistency term \(L_\mathrm{mass}\)
 encourage unit quaternions and non-increasing mass along the trajectory.
-Additional soft losses are available to enforce vertical motion structure,
-position--velocity consistency, temporal smoothing of altitude and velocity,
-and suppression of spurious lateral velocities and accelerations during
-near-vertical flight. Their weights can be scheduled in time so that the model
-first focuses on fitting the data and coarse physics, with higher-order
-regularisation activated gradually later in training. Together, these elements
+
+\paragraph{Loss function term interpretations.}
+The additional soft losses serve specific physical and numerical purposes:
+\begin{itemize}
+  \item \(L_\mathrm{mass,res}\): Ensures mass decreases monotonically,
+        preventing unphysical mass gain that could arise from data fitting
+        alone.
+  \item \(L_\mathrm{vz,res}\): Encourages realistic vertical velocity
+        evolution, ensuring the model captures the acceleration--deceleration
+        profile of ascent trajectories.
+  \item \(L_\mathrm{vxy,res}\): Suppresses spurious horizontal velocity
+        components, as sounding rockets should follow near-vertical trajectories.
+  \item \(L_\mathrm{smooth,z}\), \(L_\mathrm{smooth,vz}\): Temporal smoothing
+        terms that prevent oscillatory predictions in altitude and vertical
+        velocity, which can arise from noisy data or insufficient physics
+        constraints.
+  \item \(L_\mathrm{smooth,pos}\): Smooths position predictions to ensure
+        physically plausible trajectories without sudden jumps.
+  \item \(L_\mathrm{pos,vel}\): Enforces kinematic consistency between
+        position and velocity (i.e., \(\dot{\mathbf{r}} = \mathbf{v}\)).
+  \item \(L_\mathrm{zero,vxy}\), \(L_\mathrm{zero,axy}\): Suppress horizontal
+        velocities and accelerations during near-vertical flight, as lateral
+        motion should be minimal for sounding rockets.
+  \item \(L_\mathrm{hacc}\), \(L_\mathrm{xy,zero}\): Additional constraints on
+        horizontal acceleration and position to ensure vertical ascent
+        behavior.
+\end{itemize}
+These regularization terms work together to ensure that the learned model
+produces physically plausible trajectories that respect the expected behavior
+of sounding rocket ascent, even when training data is limited or contains
+outliers.
+
+Training employs a phased schedule where loss weights are adjusted over time.
+In the initial phase (approximately the first 55\% of training epochs), the
+model focuses on fitting the data and coarse physics constraints, with lower
+weights on higher-order regularisation terms. In the second phase, these
+regularisation weights are gradually increased using a cosine ramp schedule,
+allowing the model to refine its predictions while maintaining physical
+consistency. This phased approach helps prevent the model from overfitting to
+the regularisation terms early in training while ensuring that physical
+constraints are properly enforced in the final model. Together, these elements
 yield a training objective that balances data fidelity with dynamical
 consistency and structural robustness.
+
+\paragraph{RMSE calculation.}
+Model performance is evaluated using root mean square error (RMSE) computed on
+the test set. For a trained Direction AN model, predictions
+\(\hat{x}_\theta(t_k)\) are generated for all test trajectories on a uniform time
+grid \(\{t_k\}_{k=0}^{N-1}\) spanning the trajectory duration (typically 30
+seconds). The total RMSE is computed as
+\[
+  \mathrm{RMSE}_\mathrm{total} = \sqrt{\frac{1}{B \cdot N \cdot D} \sum_{b=1}^{B}
+  \sum_{k=0}^{N-1} \sum_{d=1}^{D} \left(\hat{x}_\theta^{(b)}(t_k)_d - 
+  x^\star{(b)}(t_k)_d\right)^2},
+\]
+where \(B\) is the number of test trajectories (typically 20), \(N = 1501\) is the
+number of time points in the discretized trajectory grid (corresponding to a
+sampling rate of approximately 50 Hz), \(D = 14\) is the state dimension, and
+\(x^\star{(b)}(t_k)\) denotes the ground truth state for trajectory \(b\) at time
+\(t_k\). The summation over \(k\) from \(0\) to \(N-1\) averages the squared
+errors across all time points in each trajectory, while the summation over \(b\)
+averages across all test trajectories, and the summation over \(d\) averages
+across all state components. Per-component RMSE is computed by averaging over
+trajectories and time points for each state dimension \(d\), while aggregated
+metrics are computed for translation (components 1--6: position and velocity),
+rotation (components 7--13: quaternion and angular velocity), and mass
+(component 14). All RMSE values are reported in nondimensional units, reflecting
+the scaled state representation used during training. The current Direction AN
+model achieves a total RMSE of approximately 0.197 on the test set, with
+translation RMSE of 0.264, rotation RMSE of 0.133, and mass RMSE of 0.015.
 
 \subsection{Planned Extensions}
 
@@ -415,14 +634,3 @@ Several extensions are planned to increase fidelity and robustness:
 Further work will also focus on integrating the C++ truth integrator more
 tightly with the Python/ML stack, enabling closed-loop validation of learned
 controllers and surrogates against the highest-fidelity model.
-
-\section{Document Structure}
-
-The remainder of the thesis expands on the elements introduced here. A
-dedicated chapter presents the detailed derivation and validation of the
-6-DOF dynamics model. Subsequent chapters describe the optimal control
-formulation and numerical methods, the data generation process and learned
-surrogate models, and finally the numerical results, validation studies, and
-conclusions.
-
-

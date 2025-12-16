@@ -2,19 +2,31 @@
 \@writefile{toc}{\contentsline {section}{\numberline {1}Introduction}{1}{}\protected@file@percent }
 \@writefile{toc}{\contentsline {section}{\numberline {2}Physical Model}{1}{}\protected@file@percent }
 \newlabel{sec:physical-model}{{2}{1}{}{section.2}{}}
-\@writefile{toc}{\contentsline {subsection}{\numberline {2.1}State, Control, and Reference Frames}{1}{}\protected@file@percent }
-\@writefile{toc}{\contentsline {subsection}{\numberline {2.2}Forces, Moments, and Mass Flow}{2}{}\protected@file@percent }
-\@writefile{toc}{\contentsline {subsection}{\numberline {2.3}Assumptions and Limitations}{3}{}\protected@file@percent }
-\@writefile{toc}{\contentsline {section}{\numberline {3}Numerical Solution and Optimal Control Formulation}{3}{}\protected@file@percent }
-\newlabel{sec:numerical-solution}{{3}{3}{}{section.3}{}}
-\@writefile{toc}{\contentsline {subsection}{\numberline {3.1}Direct Optimal Control and Transcription}{3}{}\protected@file@percent }
-\@writefile{toc}{\contentsline {subsection}{\numberline {3.2}CasADi-Based Dynamics and IPOPT Solver}{4}{}\protected@file@percent }
-\@writefile{toc}{\contentsline {subsection}{\numberline {3.3}Truth Integration and PINN Dynamics}{4}{}\protected@file@percent }
-\@writefile{toc}{\contentsline {section}{\numberline {4}Methodology, Current Status, and Planned Extensions}{5}{}\protected@file@percent }
-\newlabel{sec:methodology}{{4}{5}{}{section.4}{}}
-\@writefile{toc}{\contentsline {subsection}{\numberline {4.1}Overall Methodology}{5}{}\protected@file@percent }
-\@writefile{toc}{\contentsline {subsection}{\numberline {4.2}Current State of Data and Models}{5}{}\protected@file@percent }
-\@writefile{toc}{\contentsline {subsection}{\numberline {4.3}Direction AN Model and Training Objective}{6}{}\protected@file@percent }
-\@writefile{toc}{\contentsline {subsection}{\numberline {4.4}Planned Extensions}{7}{}\protected@file@percent }
-\@writefile{toc}{\contentsline {section}{\numberline {5}Document Structure}{7}{}\protected@file@percent }
-\gdef \@abspage@last{8}
+\@writefile{toc}{\contentsline {subsection}{\numberline {2.1}Notation}{1}{}\protected@file@percent }
+\newlabel{subsec:notation}{{2.1}{1}{}{subsection.2.1}{}}
+\@writefile{toc}{\contentsline {subsection}{\numberline {2.2}State, Control, and Reference Frames}{1}{}\protected@file@percent }
+\@writefile{lot}{\contentsline {table}{\numberline {1}{\ignorespaces Notation and typical parameter ranges}}{2}{}\protected@file@percent }
+\newlabel{tab:notation}{{1}{2}{}{table.1}{}}
+\@writefile{toc}{\contentsline {paragraph}{Physical scale and typical values.}{3}{}\protected@file@percent }
+\@writefile{toc}{\contentsline {paragraph}{Control representation across the pipeline.}{3}{}\protected@file@percent }
+\@writefile{toc}{\contentsline {subsection}{\numberline {2.3}Forces, Moments, and Mass Flow}{3}{}\protected@file@percent }
+\@writefile{toc}{\contentsline {subsection}{\numberline {2.4}Assumptions and Limitations}{5}{}\protected@file@percent }
+\@writefile{toc}{\contentsline {paragraph}{Motivation for simplifications.}{5}{}\protected@file@percent }
+\@writefile{toc}{\contentsline {section}{\numberline {3}Numerical Solution and Optimal Control Formulation}{5}{}\protected@file@percent }
+\newlabel{sec:numerical-solution}{{3}{5}{}{section.3}{}}
+\@writefile{toc}{\contentsline {subsection}{\numberline {3.1}Direct Optimal Control and Transcription}{5}{}\protected@file@percent }
+\@writefile{toc}{\contentsline {subsection}{\numberline {3.2}CasADi-Based Dynamics and IPOPT Solver}{6}{}\protected@file@percent }
+\@writefile{toc}{\contentsline {subsection}{\numberline {3.3}Truth Integration and PINN Dynamics}{6}{}\protected@file@percent }
+\@writefile{toc}{\contentsline {section}{\numberline {4}Methodology, Current Status, and Planned Extensions}{7}{}\protected@file@percent }
+\newlabel{sec:methodology}{{4}{7}{}{section.4}{}}
+\@writefile{toc}{\contentsline {subsection}{\numberline {4.1}Overall Methodology}{7}{}\protected@file@percent }
+\@writefile{toc}{\contentsline {subsection}{\numberline {4.2}Current State of Data and Models}{7}{}\protected@file@percent }
+\@writefile{toc}{\contentsline {paragraph}{Nondimensionalization and scaling.}{8}{}\protected@file@percent }
+\@writefile{toc}{\contentsline {subsection}{\numberline {4.3}Direction AN Model and Training Objective}{8}{}\protected@file@percent }
+\@writefile{toc}{\contentsline {paragraph}{Architecture design rationale.}{9}{}\protected@file@percent }
+\@writefile{toc}{\contentsline {paragraph}{Loss function term interpretations.}{10}{}\protected@file@percent }
+\@writefile{toc}{\contentsline {paragraph}{RMSE calculation.}{11}{}\protected@file@percent }
+\@writefile{toc}{\contentsline {subsection}{\numberline {4.4}Planned Extensions}{11}{}\protected@file@percent }
+\@writefile{lof}{\contentsline {figure}{\numberline {1}{\ignorespaces Architecture of the Direction AN model. The shared stem processes time and context inputs to produce a latent representation \(z(t, c)\). Three specialized branches (translation, rotation, mass) map this latent space to the corresponding state components. The physics residual layer computes dynamics residuals to enforce physical consistency.}}{12}{}\protected@file@percent }
+\newlabel{fig:direction_an_architecture}{{1}{12}{}{figure.1}{}}
+\gdef \@abspage@last{12}
