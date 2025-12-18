@@ -1,0 +1,526 @@
+% Materials and Methods chapter for the thesis on physics-informed surrogate modelling
+% for rocket ascent trajectory dynamics. This file is intended to be included from
+% the main thesis document.
+
+\chapter{Materials and Methods}
+
+\section{Overview of the Methodological Workflow}
+
+The methodology was organized around three sequential stages. First, a physical
+model of six-degree-of-freedom (6-DOF) rocket dynamics was formulated and
+implemented numerically. Second, optimal control trajectories were generated
+using direct collocation methods and used to construct training datasets. Third,
+physics-informed neural network (PINN) surrogates were trained on these datasets
+to approximate the dynamics. The relationship between the optimal control solver,
+truth integrator, and PINN surrogate is illustrated schematically in
+Figure~\ref{fig:Relationship_OTP_PINN}.
+
+\begin{figure}[htbp]
+    \centering
+    \includegraphics[width=14.5cm]{figures/RelaOTP.pdf}
+    \caption{Schematic diagram illustrating the relationship between the optimal control solver, truth integrator, and PINN surrogate in the methodological workflow.}
+    \label{fig:Relationship_OTP_PINN}
+\end{figure}
+
+\subsection{Rocket Dynamics Model}
+
+\subsubsection{Reference Frames and Coordinate Systems}
+
+Two primary reference frames were used. The inertial frame was defined as
+Earth-centred and non-rotating, with the \(z\)-axis pointing upward (opposite to
+gravity). The body frame was defined as vehicle-fixed, with the \(x\)-axis aligned
+with the nominal thrust direction. Transformations between frames were
+represented using unit quaternions.
+
+The state vector \(\mathbf{x}(t) \in \mathbb{R}^{14}\) was defined as
+\[
+  \mathbf{x}(t) =
+  \begin{bmatrix}
+    \mathbf{r}_\mathrm{i}^\top &
+    \mathbf{v}_\mathrm{i}^\top &
+    \mathbf{q}^\top &
+    \boldsymbol{\omega}_\mathrm{b}^\top &
+    m
+  \end{bmatrix}^\top ,
+\]
+where \(\mathbf{r}_\mathrm{i} \in \mathbb{R}^3\) was the position in the inertial
+frame, \(\mathbf{v}_\mathrm{i} \in \mathbb{R}^3\) was the inertial velocity,
+\(\mathbf{q} = [q_0, q_1, q_2, q_3]^\top\) was a unit quaternion representing the
+attitude (body-to-inertial rotation), \(\boldsymbol{\omega}_\mathrm{b} \in
+\mathbb{R}^3\) was the angular velocity expressed in the body frame, and \(m \in
+\mathbb{R}\) was the mass of the vehicle.
+
+The control vector \(\mathbf{u}(t) \in \mathbb{R}^4\) was defined as
+\[
+  \mathbf{u}(t) =
+  \begin{bmatrix}
+    T &
+    \theta_\mathrm{g} &
+    \phi_\mathrm{g} &
+    \delta
+  \end{bmatrix}^\top ,
+\]
+where \(T\) was the commanded thrust magnitude, \(\theta_\mathrm{g}\) and
+\(\phi_\mathrm{g}\) were the thrust gimbal pitch and yaw angles, and \(\delta\) was a
+representative control surface deflection.
+
+The body-to-inertial rotation matrix
+\(R_{\mathrm{b}\to\mathrm{i}}(\mathbf{q})\) was obtained from the quaternion
+\(\mathbf{q}\). Its transpose \(R_{\mathrm{i}\to\mathrm{b}} =
+R_{\mathrm{b}\to\mathrm{i}}^\top\) transformed vectors from the inertial frame to
+the body frame.
+
+\subsubsection{Equations of Motion}
+
+The translational motion was governed by Newton's second law:
+\[
+  \dot{\mathbf{r}}_\mathrm{i} = \mathbf{v}_\mathrm{i}, \qquad
+  \dot{\mathbf{v}}_\mathrm{i} =
+  \frac{1}{m}\,\mathbf{F}_\mathrm{i}(\cdot) + \mathbf{g}_\mathrm{i}(\mathbf{r}_\mathrm{i}),
+\]
+where \(\mathbf{F}_\mathrm{i}\) was the total non-gravitational force in the
+inertial frame and \(\mathbf{g}_\mathrm{i}\) was the gravitational acceleration.
+A constant gravitational field \(\mathbf{g}_\mathrm{i} = [0, 0, -g_0]^\top\) was
+employed, where \(g_0 = 9.81\) m/s\(^2\) was the nominal surface gravity.
+
+Rotational dynamics were expressed as
+\[
+  \dot{\mathbf{q}} =
+    \tfrac{1}{2}\,\mathbf{q} \otimes
+    \begin{bmatrix}0 \\ \boldsymbol{\omega}_\mathrm{b}\end{bmatrix},
+  \qquad
+  \dot{\boldsymbol{\omega}}_\mathrm{b}
+    = \mathbf{I}_\mathrm{b}^{-1}
+      \Bigl(
+        \mathbf{M}_\mathrm{b} -
+        \boldsymbol{\omega}_\mathrm{b} \times
+        (\mathbf{I}_\mathrm{b}\boldsymbol{\omega}_\mathrm{b})
+      \Bigr),
+\]
+where \(\mathbf{I}_\mathrm{b}\) was the inertia tensor in the body frame and
+\(\mathbf{M}_\mathrm{b}\) was the sum of aerodynamic and thrust moments.
+
+The mass dynamics followed the standard rocket equation:
+\[
+  \dot{m} = -\frac{T}{I_\mathrm{sp} g_0},
+\]
+with specific impulse \(I_\mathrm{sp}\) and surface gravity \(g_0\). A dry-mass
+limit was enforced in the implementation to prevent unphysical mass depletion.
+
+\subsubsection{Aerodynamic and Propulsion Models}
+
+The atmosphere was modelled by an exponential density profile:
+\[
+  \rho(h) = \rho_0 \exp\!\left(-\frac{h}{h_\mathrm{scale}}\right),
+\]
+where \(h\) was altitude above sea level, \(\rho_0 = 1.225\) kg/m\(^3\) was the
+sea-level density, and \(h_\mathrm{scale} = 8400\) m was a scale height. The
+dynamic pressure was computed as
+\[
+  q_\mathrm{dyn} = \frac{1}{2}\,\rho(h)\,\|\mathbf{v}_\mathrm{rel,b}\|^2,
+\]
+where \(\mathbf{v}_\mathrm{rel,b}\) was the relative wind velocity in the body
+frame.
+
+Aerodynamic forces were naturally expressed in the body frame. The relative wind
+velocity was computed as
+\[
+  \mathbf{v}_\mathrm{rel,i} = \mathbf{v}_\mathrm{i} - \mathbf{v}_\mathrm{wind,i},
+  \qquad
+  \mathbf{v}_\mathrm{rel,b} =
+  R_{\mathrm{i}\to\mathrm{b}}(\mathbf{q})\,\mathbf{v}_\mathrm{rel,i},
+\]
+where \(\mathbf{v}_\mathrm{wind,i}\) was the wind velocity in the inertial frame.
+Wind disturbances were neglected, so \(\mathbf{v}_\mathrm{wind,i} = \mathbf{0}\).
+
+Drag and lift forces in the body frame took the form
+\[
+  \mathbf{F}_\mathrm{D,b}
+    = - q_\mathrm{dyn} S_\mathrm{ref} C_\mathrm{D}\,\hat{\mathbf{v}}_\mathrm{rel,b},
+  \qquad
+  \mathbf{F}_\mathrm{L,b}
+    = q_\mathrm{dyn} S_\mathrm{ref} C_{\mathrm{L}\alpha}\,\alpha\,
+      \hat{\mathbf{e}}_\mathrm{L},
+\]
+where \(S_\mathrm{ref}\) was a reference area, \(C_\mathrm{D}\) was the drag
+coefficient, \(C_{\mathrm{L}\alpha}\) was a lift-curve slope, \(\alpha\) was the
+angle of attack computed from \(\mathbf{v}_\mathrm{rel,b}\), and
+\(\hat{\mathbf{e}}_\mathrm{L}\) was a unit lift direction approximately
+perpendicular to the body \(x\)-axis and the relative velocity.
+
+The thrust vector in the body frame was
+\[
+  \mathbf{u}_T =
+  \begin{bmatrix}
+    \cos\theta_\mathrm{g}\cos\phi_\mathrm{g} \\
+    \sin\phi_\mathrm{g} \\
+    \sin\theta_\mathrm{g}\cos\phi_\mathrm{g}
+  \end{bmatrix},
+  \qquad
+  \mathbf{F}_\mathrm{T,b} = T\,\frac{\mathbf{u}_T}{\|\mathbf{u}_T\|},
+\]
+so that the total non-gravitational force in the body frame was
+\[
+  \mathbf{F}_\mathrm{b} =
+  \mathbf{F}_\mathrm{T,b} +
+  \mathbf{F}_\mathrm{D,b} +
+  \mathbf{F}_\mathrm{L,b},
+  \qquad
+  \mathbf{F}_\mathrm{i} =
+  R_{\mathrm{b}\to\mathrm{i}}(\mathbf{q})\,\mathbf{F}_\mathrm{b}.
+\]
+
+\subsection{Numerical Simulation and Trajectory Generation}
+
+\subsubsection{Optimal Control Problem Formulation}
+
+The ascent trajectory design problem was posed as a continuous-time optimal
+control problem (OCP) over a finite horizon \(t \in [0, t_f]\), with the 6-DOF
+dynamics as constraints. The objective function was formulated to minimize fuel
+consumption, subject to path and terminal constraints on altitude, velocity,
+attitude, and structural loads. The time horizon was fixed at \(t_f = 30\) s.
+
+The control vector \(\mathbf{u}(t) \in \mathbb{R}^4\) was defined as
+\[
+  \mathbf{u}(t) =
+  \begin{bmatrix}
+    T &
+    \theta_\mathrm{g} &
+    \phi_\mathrm{g} &
+    \delta
+  \end{bmatrix}^\top ,
+\]
+with bounds on thrust magnitude \(T \in [0, T_\mathrm{max}]\), gimbal angles
+\(\theta_\mathrm{g}, \phi_\mathrm{g} \in [-\theta_\mathrm{max},
+\theta_\mathrm{max}]\), and control surface deflection \(\delta \in
+[-\delta_\mathrm{max}, \delta_\mathrm{max}]\). Path constraints enforced maximum
+dynamic pressure \(q_\mathrm{dyn} \leq q_\mathrm{dyn,max}\) and maximum load
+factor \(n \leq n_\mathrm{max}\).
+
+The OCP was discretised using a direct collocation method. The continuous state
+and control trajectories were approximated on a uniform grid of nodes
+\(\{t_k\}_{k=0}^N\) with step size \(h = t_f/N\). At each node, the state
+\(x_k \approx x(t_k)\) and control \(u_k \approx u(t_k)\) became decision
+variables in a finite-dimensional nonlinear programme (NLP). The dynamics were
+enforced via Hermite--Simpson collocation, which provided third-order accuracy
+by introducing a collocation point at the midpoint of each interval and enforcing
+a defect constraint of the form
+\[
+  x_{k+1}
+  = x_k + \frac{h}{6}
+    \bigl(
+      f(x_k, u_k) + 4 f(x_m, u_m) + f(x_{k+1}, u_{k+1})
+    \bigr),
+\]
+where \(f(x,u)\) denotes the state derivative, \(x_m\) is a midpoint state
+constructed from \((x_k,x_{k+1})\) and \((f(x_k,u_k), f(x_{k+1},u_{k+1}))\), and
+\(u_m\) is the midpoint control. The resulting collocation defects were enforced
+as equality constraints in the NLP.
+
+\subsubsection{Numerical Solvers and Software}
+
+The 6-DOF dynamics, including aerodynamics, thrust, and mass depletion, were
+implemented symbolically in CasADi. This provided exact Jacobians and Hessians to
+the NLP solver, which was crucial for robustness and performance in the presence
+of stiff dynamics and tight path constraints. Special care was taken in the
+implementation to avoid non-differentiabilities and division by small quantities,
+for example by using smooth norm approximations and explicit clamping of mass
+and thrust.
+
+The discretised OCP was solved using IPOPT, a large-scale interior-point
+nonlinear optimiser. State and control variables were scaled using reference
+length, velocity, time, mass, and force scales to improve conditioning, and
+linear solver backends (such as MUMPS or HSL variants) were selected
+automatically depending on availability. The framework supported both fixed and
+free final time, with appropriate bounds on \(t_f\) when treated as a decision
+variable.
+
+Path constraints on dynamic pressure \(q_\mathrm{dyn}\), load factor \(n\), and
+mass were enforced directly in the NLP using auxiliary CasADi functions for these
+quantities. Operational limits on gimbal angles, control-surface deflections,
+and angle of attack were also encoded in the state and control bounds.
+
+In addition to the collocation-based OCP solver, a high-fidelity C++
+integrator for the same 6-DOF dynamics was implemented and used as a truth
+model for validation and data generation. This integrator supported
+inverse-square gravity, exponential atmosphere, aerodynamic forces and moments,
+wind callbacks, and detailed diagnostic outputs such as dynamic pressure, load
+factor, and constraint violations.
+
+For data-driven approximation, a differentiable version of the dynamics was
+implemented in PyTorch. This module mirrored the CasADi model, including the
+state and control definitions, aerodynamic coefficients, and mass dynamics, but
+used tensor operations to enable automatic differentiation.
+
+The time discretization was fixed at \(N = 1501\) points, corresponding to a
+30-second flight duration sampled at 50 Hz.
+
+\subsection{Dataset Construction and Preprocessing}
+
+\subsubsection{Dataset Structure}
+
+The data pipeline produced a hierarchy of datasets. At the lowest level, raw cases
+were stored as individual HDF5 files containing time grids, full 14-D state
+trajectories, control histories, monitor signals (e.g., dynamic pressure and load
+factor), and rich metadata including physical parameters, solver statistics, and
+configuration hashes. These raw cases were then aggregated into processed split
+files (train/validation/test) in nondimensional form.
+
+The processed datasets contained approximately 120 training cases, 20 validation
+cases, and 20 test cases. Each trajectory was discretised on a uniform time
+grid with \(N = 1501\) points, corresponding to a 30-second flight duration
+sampled at 50 Hz. Each processed dataset exposed a time grid, a context vector
+\(\mathbf{c} \in \mathbb{R}^7\) encoding key physical and environmental
+parameters (initial mass \(m_0\), specific impulse \(I_\mathrm{sp}\), drag
+coefficient \(C_\mathrm{D}\), lift-curve slope \(C_{\mathrm{L}\alpha}\),
+pitch-moment coefficient \(C_{\mathrm{m}\alpha}\), maximum thrust
+\(T_\mathrm{max}\), and wind magnitude), and normalised state targets.
+
+The state tensor shape was \(\text{state} \in \mathbb{R}^{N_\mathrm{cases}
+\times N_\mathrm{time} \times 14}\), where \(N_\mathrm{cases}\) is the number
+of trajectories, \(N_\mathrm{time} = 1501\) is the number of time points, and
+14 is the state dimension.
+
+\subsubsection{Nondimensionalization and Scaling}
+
+All state and control variables were nondimensionalized using physics-aware
+reference scales to improve numerical conditioning and enable scale-invariant
+learning. The reference scales were chosen to yield quantities of order unity,
+as summarized in Table~\ref{tab:reference-scales-mm}.
+
+\begin{table}[h]
+\centering
+\caption{Reference scales for nondimensionalization}
+\label{tab:reference-scales-mm}
+\begin{tabular}{llll}
+\toprule
+Quantity & Symbol & Value & Motivation \\
+\midrule
+Length & \(L_\mathrm{ref}\) & 10,000 m & Typical altitude \\
+Velocity & \(V_\mathrm{ref}\) & 313 m/s & \(\sqrt{g_0 L_\mathrm{ref}}\) \\
+Time & \(T_\mathrm{ref}\) & 31.62 s & \(L_\mathrm{ref}/V_\mathrm{ref}\) \\
+Mass & \(M_\mathrm{ref}\) & 50 kg & Nominal wet mass \\
+Force & \(F_\mathrm{ref}\) & 490 N & \(M_\mathrm{ref} g_0\) \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+The scaling equation was
+\[
+  \tilde{x} = \frac{x}{x_\mathrm{ref}},
+\]
+where \(\tilde{x}\) is the nondimensionalized quantity and \(x_\mathrm{ref}\) is the
+corresponding reference scale. This nondimensionalization ensured that all state
+components were typically in the range \([0.1, 10]\), which improved gradient
+flow during neural network training and reduced numerical errors in the
+optimization solver. The scaling was inverted during evaluation to recover
+dimensional quantities.
+
+\subsection{Physics-Informed Neural Network Model}
+
+\subsubsection{Model Inputs and Outputs}
+
+The model inputs were time \(t\) (a scalar) and a context vector
+\(\mathbf{c} \in \mathbb{R}^7\) encoding physical and environmental parameters.
+The model output was the state vector \(\mathbf{x}(t) \in \mathbb{R}^{14}\).
+
+\subsubsection{Network Architecture (Direction AN)}
+
+The Direction AN architecture was organized into three stages (see
+Figure~\ref{fig:direction_an_architecture}). A shared stem first embedded the
+normalised time and context: time was expanded by Fourier features with 8
+frequencies, while the context vector was passed through a small encoder (a
+shallow multilayer perceptron) and then concatenated with the time embedding.
+This combined input was processed by a residual multilayer perceptron with 4
+layers, hidden dimension 128, skip connections, tanh activation, and layer
+normalization, yielding a latent feature sequence \(z(t, c)\) of fixed dimension
+along the trajectory.
+
+On top of this shared latent representation, three mission branches specialized
+to different parts of the 14-D state. A translation branch with hidden dimensions
+\([128, 128]\) mapped \(z\) to position and velocity components
+\([\mathbf{r}_\mathrm{i}, \mathbf{v}_\mathrm{i}]\). A rotation branch with hidden
+dimensions \([256, 256]\) mapped \(z\) to quaternion and angular velocity
+components \([\mathbf{q}, \boldsymbol{\omega}_\mathrm{b}]\) with explicit
+quaternion renormalization. A mass branch with hidden dimension \([64]\)
+produced the mass trajectory \(m(t)\). The concatenation of these branch outputs
+formed the predicted state \(x_\theta(t)\).
+
+\subsubsection{Physics Residual Computation}
+
+The physics residual was computed using finite difference derivative
+approximations, rather than automatic differentiation. For interior points, a
+central difference scheme was used:
+\[
+  \frac{dx}{dt} \approx \frac{x_{i+1} - x_{i-1}}{2\Delta t},
+\]
+where \(\Delta t = 0.02\) s is the time step (corresponding to 50 Hz sampling).
+For boundary points, forward difference (first point) and backward difference
+(last point) schemes were used.
+
+In the PINN setting, explicit control inputs were omitted and set to zero in the
+physics residual, reflecting the design choice that the network learned state
+evolution implicitly from trajectories rather than from control commands. The
+control \(\mathbf{u}_k\) in the physics loss was therefore set to zero
+(\(\mathbf{u}_k = [0, 0, 0, 0]^\top\)). This zero-control assumption was
+consistent with the processed dataset format, which did not include control
+trajectories.
+
+\subsection{Training Procedure}
+
+\subsubsection{Loss Function Components}
+
+The training objective for Direction AN followed a physics-informed pattern.
+Given a reference trajectory \(x^\star(t_k)\) on a uniform grid
+\(\{t_k\}_{k=0}^{N-1}\), the total loss consisted of four groups: (1) data
+fidelity losses, (2) physics consistency losses, (3) structural constraints, and (4)
+smoothing and trajectory regularization.
+
+The data loss \(L_\mathrm{data}\) was a component-weighted mean-squared error
+between predicted and true states, with separate group weights for translation,
+rotation, and mass:
+\[
+  L_\mathrm{data} = \lambda_\mathrm{translation} L_\mathrm{translation} +
+  \lambda_\mathrm{rotation} L_\mathrm{rotation} +
+  \lambda_\mathrm{mass} L_\mathrm{mass},
+\]
+where \(\lambda_\mathrm{translation} = 1.0\), \(\lambda_\mathrm{rotation} =
+1.0\), and \(\lambda_\mathrm{mass} = 1.0\) were the group weights, and
+\(L_\mathrm{translation}\), \(L_\mathrm{rotation}\), and \(L_\mathrm{mass}\) were
+component-weighted MSE losses for the respective state groups.
+
+The physics loss \(L_\mathrm{phys}\) penalised violations of the continuous
+dynamics by comparing a finite-difference estimate of the time derivative
+\(\dot{x}_\theta(t_k)\) to the right-hand side \(f(x_\theta(t_k), \mathbf{u}_k =
+\mathbf{0}; \mathbf{p})\) of the 6-DOF model implemented in PyTorch:
+\[
+  L_\mathrm{phys}
+  = \frac{1}{N} \sum_{k=0}^{N-1}
+    \bigl\|
+      \dot{x}_\theta(t_k) - f(x_\theta(t_k), \mathbf{u}_k = \mathbf{0}; \mathbf{p})
+    \bigr\|^2 .
+\]
+
+A boundary term \(L_\mathrm{bc}\) enforced agreement between predicted and true
+initial conditions:
+\[
+  L_\mathrm{bc} = \|\mathbf{x}_\theta(0) - \mathbf{x}^\star(0)\|^2.
+\]
+
+Additional regularization terms were included:
+\begin{itemize}
+  \item \(L_\mathrm{mass,res}\): Mass residual loss ensuring mass decreases
+        monotonically
+  \item \(L_\mathrm{vz,res}\): Vertical velocity residual loss
+  \item \(L_\mathrm{vxy,res}\): Horizontal velocity residual loss
+  \item \(L_\mathrm{smooth,z}\): Temporal smoothing for altitude
+  \item \(L_\mathrm{smooth,vz}\): Temporal smoothing for vertical velocity
+  \item \(L_\mathrm{pos,vel}\): Position--velocity consistency loss
+  \item \(L_\mathrm{smooth,pos}\): Position smoothing loss
+  \item \(L_\mathrm{zero,vxy}\): Zero horizontal velocity loss
+  \item \(L_\mathrm{zero,axy}\): Zero horizontal acceleration loss
+  \item \(L_\mathrm{hacc}\): Horizontal acceleration constraint loss
+  \item \(L_\mathrm{xy,zero}\): Zero horizontal position loss
+\end{itemize}
+
+The total loss was
+\begin{equation}
+\begin{split}
+  \mathcal{L} &= \lambda_\mathrm{data} L_\mathrm{data} +
+  \lambda_\mathrm{phys} L_\mathrm{phys} +
+  \lambda_\mathrm{bc} L_\mathrm{bc} \\
+  &\quad + \lambda_\mathrm{mass,res} L_\mathrm{mass,res} +
+  \lambda_\mathrm{vz,res} L_\mathrm{vz,res} +
+  \lambda_\mathrm{vxy,res} L_\mathrm{vxy,res} \\
+  &\quad + \lambda_\mathrm{smooth,z} L_\mathrm{smooth,z} +
+  \lambda_\mathrm{smooth,vz} L_\mathrm{smooth,vz} +
+  \lambda_\mathrm{pos,vel} L_\mathrm{pos,vel} \\
+  &\quad + \lambda_\mathrm{smooth,pos} L_\mathrm{smooth,pos} +
+  \lambda_\mathrm{zero,vxy} L_\mathrm{zero,vxy} +
+  \lambda_\mathrm{zero,axy} L_\mathrm{zero,axy} \\
+  &\quad + \lambda_\mathrm{hacc} L_\mathrm{hacc} +
+  \lambda_\mathrm{xy,zero} L_\mathrm{xy,zero},
+\end{split}
+\end{equation}
+where the loss weights were set to \(\lambda_\mathrm{data} = 1.0\),
+\(\lambda_\mathrm{phys} = 0.1\), \(\lambda_\mathrm{bc} = 1.0\),
+\(\lambda_\mathrm{mass,res} = 0.05\), \(\lambda_\mathrm{vz,res} = 0.05\),
+\(\lambda_\mathrm{vxy,res} = 0.01\), \(\lambda_\mathrm{smooth,z} = 5.0 \times
+10^{-4}\), \(\lambda_\mathrm{smooth,vz} = 1.0 \times 10^{-4}\),
+\(\lambda_\mathrm{pos,vel} = 1.0\), \(\lambda_\mathrm{smooth,pos} = 2.0 \times
+10^{-3}\), \(\lambda_\mathrm{zero,vxy} = 1.0\), \(\lambda_\mathrm{zero,axy} =
+1.0\), \(\lambda_\mathrm{hacc} = 0.02\), and \(\lambda_\mathrm{xy,zero} = 5.0\).
+
+\subsubsection{Optimization and Training Schedule}
+
+The network was trained using the Adam optimizer with learning rate \(1.0 \times
+10^{-3}\), weight decay \(1.0 \times 10^{-5}\), and batch size 8. Training was
+conducted for 160 epochs. A cosine annealing learning rate scheduler was used
+with \(T_\mathrm{max} = 160\) and minimum learning rate \(\eta_\mathrm{min} = 1.0
+\times 10^{-6}\).
+
+A phased training schedule was employed where loss weights were adjusted over
+time. In the initial phase (approximately the first 55\% of training epochs),
+the model focused on fitting the data and coarse physics constraints, with
+lower weights on higher-order regularization terms. In the second phase, these
+regularization weights were gradually increased using a cosine ramp schedule,
+allowing the model to refine its predictions while maintaining physical
+consistency.
+
+Early stopping was implemented with patience 25 for phase 1 and patience 40 for
+phase 2, with minimum delta 0.0.
+
+\subsection{Evaluation Metrics}
+
+Model performance was evaluated using root mean square error (RMSE) computed on
+the test set. For a trained Direction AN model, predictions
+\(\hat{\mathbf{x}}_\theta(t_k)\) were generated for all test trajectories on a
+uniform time grid \(\{t_k\}_{k=0}^{N-1}\) spanning the trajectory duration
+(30 seconds). The total RMSE was computed as
+\[
+  \mathrm{RMSE}_\mathrm{total} = \sqrt{\frac{1}{B \cdot N \cdot D} \sum_{b=1}^{B}
+  \sum_{k=0}^{N-1} \sum_{d=1}^{D} \left(\hat{x}_\theta^{(b)}(t_k)_d - 
+  x^{\star(b)}(t_k)_d\right)^2},
+\]
+where \(B = 20\) was the number of test trajectories, \(N = 1501\) was the number
+of time points in the discretized trajectory grid (corresponding to a sampling
+rate of approximately 50 Hz), \(D = 14\) was the state dimension, and
+\(x^{\star(b)}(t_k)\) denoted the ground truth state for trajectory \(b\) at time
+\(t_k\). The summation over \(k\) from \(0\) to \(N-1\) averaged the squared
+errors across all time points in each trajectory, while the summation over \(b\)
+averaged across all test trajectories, and the summation over \(d\) averaged across
+all state components.
+
+Per-component RMSE was computed by averaging over trajectories and time points
+for each state dimension \(d\), while aggregated metrics were computed for
+translation (components 1--6: position and velocity), rotation (components
+7--13: quaternion and angular velocity), and mass (component 14). All RMSE values
+were reported in nondimensional units, reflecting the scaled state
+representation used during training.
+
+\subsection{Implementation Details}
+
+The neural network models were implemented in PyTorch. The optimal control
+solver was implemented using CasADi for symbolic computation and IPOPT for
+nonlinear optimization. The truth integrator was implemented in C++. Data
+processing and training scripts were written in Python, using NumPy for
+numerical operations and HDF5 for data storage. Training was conducted on
+computational hardware with automatic device selection (CPU or GPU) depending on
+availability.
+
+\subsection{Summary of Chapter}
+
+A six-degree-of-freedom rocket dynamics model was formulated and implemented at
+three fidelity levels: a high-fidelity C++ truth integrator, a symbolic CasADi
+version for optimal control, and a differentiable PyTorch implementation for
+PINN training. Optimal control trajectories were generated using direct
+collocation with Hermite--Simpson discretization and solved using IPOPT. These
+trajectories were used to construct training datasets with 120 training cases, 20
+validation cases, and 20 test cases, each discretized on a uniform time grid
+with 1501 points over 30 seconds. A physics-informed neural network architecture
+(Direction AN) was designed with a shared stem, three specialized branches for
+translation, rotation, and mass, and a physics residual layer. The network was
+trained using a phased schedule with Adam optimization, incorporating data
+fidelity, physics consistency, structural constraints, and smoothing
+regularization terms in the loss function.
+

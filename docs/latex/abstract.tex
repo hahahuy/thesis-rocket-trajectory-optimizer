@@ -1,0 +1,18 @@
+\newpage
+
+\begin{center}
+    \fontsize{14}{16}\selectfont
+    \textbf{ABSTRACT}
+\end{center}
+\vspace{-0.3cm}
+\doublespacing
+\justifying
+This thesis investigates physics-informed neural network (PINN) surrogates for six-degree-of-freedom (6-DOF) launch vehicle ascent dynamics, with the goal of approximating high-fidelity trajectory solutions at substantially reduced computational cost. Starting from a rigid-body 6-DOF dynamics model and a direct optimal control formulation, a dataset of numerically optimal ascent trajectories is generated using collocation-based methods. These trajectories serve as supervision for training structured neural surrogates that predict full state evolution from time and mission context parameters.
+
+The primary contribution of this work is the design and evaluation of a structured PINN architecture, referred to as Direction AN, which combines Fourier time embeddings, a context encoder for physical parameters, a shared residual backbone, and specialized output branches for translational motion, rotational dynamics, and mass depletion. Physical consistency is enforced through a physics residual loss constructed from finite-difference approximations of the continuous-time equations of motion, together with additional structural constraints such as quaternion normalization, mass monotonicity, and boundary consistency. A phased training strategy is employed to balance data fidelity, physics regularization, and smoothing terms, improving stability during learning.
+    
+The resulting surrogate accurately reconstructs position, velocity, attitude, and mass trajectories over the launch phase (0–30 s) across a range of sounding-rocket configurations, producing smooth and physically plausible ascent profiles consistent with a high-fidelity truth integrator. While the surrogate is not used directly to optimize control inputs in this study, its differentiable structure and physics-aware design make it suitable for future integration into gradient-based trajectory optimization and guidance frameworks. Overall, the results demonstrate that carefully regularized PINN surrogates can serve as effective and scalable approximations of complex rocket dynamics, providing a foundation for fast analysis and optimization in ascent trajectory design.
+
+
+
+

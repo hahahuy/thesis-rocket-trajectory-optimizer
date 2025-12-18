@@ -1,0 +1,237 @@
+
+%---------------------------
+% Title Page
+%---------------------------
+\thispagestyle{empty} % No page number on title page
+\begin{titlepage}
+    \begin{center}
+        \fontsize{14}{16}\selectfont
+        \textbf{VIETNAM NATIONAL UNIVERSITY - HO CHI MINH CITY}\\
+        \textbf{INTERNATIONAL UNIVERSITY}\\
+        \textbf{DEPARTMENT OF PHYSICS}\\
+        \textbf{SPACE ENGINEERING}
+
+        \vspace{1.5cm}
+
+        % Insert your logo here if you have one
+        \includegraphics[width=3.9cm]{figures/Logohcmiu.png}\\ % Replace with your logo file
+
+        \vspace{1cm}
+
+        \fontsize{22}{26}\selectfont
+        \textbf{PHYSICS-INFORMED NEURAL NETWORK SURROGATE FOR ROCKET ASCENT TRAJECTORY OPTIMIZATION}
+
+        \vspace{1.25cm}
+
+        \fontsize{14}{16}\selectfont
+        HA QUANG HUY
+
+        \vspace{1.5cm}
+
+        \fontsize{12}{14}\selectfont
+        A THESIS SUBMITTED TO\\
+        DEPARTMENT OF PHYSICS\\
+        IN PARTIAL FULFILLMENT OF THE REQUIREMENTS\\
+        FOR THE DEGREE OF ENGINEER IN SPACE ENGINEERING
+
+        \vfill % Pushes the following text to the bottom of the page
+
+        \fontsize{14}{16}\selectfont
+        HO CHI MINH CITY, VIET NAM\\
+        2025
+    \end{center}
+\end{titlepage}
+
+
+%---------------------------
+% Appendix Page
+%---------------------------
+\begin{center}
+    \fontsize{14}{16}\selectfont
+    \textbf{Physics-Informed Neural Network Surrogate for Rocket Ascent Trajectory Optimization}
+
+    \vspace{1.25cm}
+
+    \fontsize{14}{16}\selectfont
+        HÀ QUANG HUY
+\end{center}
+\doublespacing
+\justifying
+\noindent Under the guidance and approval of the committee, and approved by its members, this thesis has been accepted in partial fulfillment of the requirements for the degree.
+
+\vspace{2cm}
+\noindent Approved:
+
+\begin{flushright}
+    \begin{minipage}{7.5cm}
+        \raggedright
+        -----------------------------------------------------
+        \vspace{-0.6cm}
+        
+        Chairperson
+
+        \vspace{1.75cm}
+
+        -----------------------------------------------------
+        \vspace{-0.6cm}
+        
+        Committee Member
+
+        \vspace{1.75cm}
+        
+        -----------------------------------------------------
+        \vspace{-0.6cm}
+        
+        Committee Member
+        
+        \vspace{1.75cm}
+
+        -----------------------------------------------------
+        \vspace{-0.6cm}
+        
+        Committee Member
+        
+        \vspace{1.75cm}
+
+        -----------------------------------------------------
+        \vspace{-0.6cm}
+
+        Committee Member
+    \end{minipage}
+\end{flushright}
+
+%---------------------------
+% HONESTY DECLARATION Page
+%---------------------------
+
+\newpage
+\begin{center}
+    \fontsize{14}{16}\selectfont
+    \textbf{HONESTY DECLARATION}
+\end{center}
+\vspace{0.5cm}
+\doublespacing
+\justifying
+My name is Hà Quang Huy. I would like to declare that, apart from the acknowledged references, this thesis either does not use language, ideas, or other original material from anyone, or has not been previously submitted to any other educational and research programs or institutions. I fully understand that any writings in this thesis that contradict the above statement will automatically lead to rejection from the SE program at the International University – Vietnam National University Ho Chi Minh City.
+\vspace{5cm}
+
+\begin{flushright}
+    Date: \today
+
+    Student Signature:
+
+    \includegraphics[width=6cm]{figures/HHsignature.png}
+
+    Hà Quang Huy
+\end{flushright}
+
+%---------------------------
+% Turnitin Declaration Page
+%---------------------------
+
+\newpage
+\begin{center}
+    \fontsize{14}{16}\selectfont
+    \textbf{TURNITIN DECLARATION}
+\end{center}
+\vspace{0.5cm}
+\doublespacing
+\justifying
+
+\noindent Name of Student: Hà Quang Huy
+
+\noindent Date: \today
+
+
+\noindent
+\begin{minipage}[t]{0.48\textwidth}
+    Suppervisor Signature:
+
+    \vspace{1.5cm} % space where supervisor signs
+    \rule{6cm}{0.4pt}
+\end{minipage}%
+\hfill
+\begin{minipage}[t]{0.48\textwidth}
+    Student Signature:
+
+    \vspace{0.3cm}
+    \includegraphics[width=6cm]{figures/HHsignature.png}
+\end{minipage}
+\vfill
+%---------------------------
+% Acknowledgments Page
+%---------------------------
+
+\newpage
+\begin{center}
+    \fontsize{14}{16}\selectfont
+    \textbf{ACKNOWLEDGMENTS}
+\end{center}
+\vspace{0.5cm}
+\doublespacing
+\justifying
+
+I would like to express my sincere gratitude to my supervisor, Dr. Nguyen Quang, for his invaluable guidance, support, and encouragement throughout this research. His expertise and insights have been instrumental in shaping the direction of this work.
+
+\vfill
+
+%---------------------------
+% Table of Contents Page
+%---------------------------
+
+\newpage
+\begin{center}
+    \fontsize{14}{16}\selectfont
+    \textbf{TABLE OF CONTENTS}
+\end{center}
+\vspace{0.5cm}
+\singlespacing % Use single spacing for table of contents
+
+\makeatletter
+\@starttoc{toc}  % Print the actual table of contents WITHOUT its own title/page break
+\makeatother
+
+\newpage
+\doublespacing % Restore double spacing for rest of document
+
+%---------------------------
+% List of Tables Page
+%---------------------------
+
+\newpage
+\begin{center}
+    \fontsize{14}{16}\selectfont
+    \textbf{LIST OF TABLES}
+\end{center}
+\vspace{0.5cm}
+\singlespacing % Use single spacing for list of tables
+\listoftables
+\newpage
+\doublespacing % Restore double spacing for rest of document
+%---------------------------
+% List of Figures Page
+%---------------------------
+
+\newpage
+\begin{center}
+    \fontsize{14}{16}\selectfont
+    \textbf{LIST OF FIGURES}
+\end{center}
+\vspace{0.5cm}
+\singlespacing % Use single spacing for list of figures
+\listoffigures
+\newpage
+\doublespacing % Restore double spacing for rest of document
+
+%---------------------------
+% ABBREVIATIONS AND NOTATIONS Page
+%---------------------------
+
+\newpage
+\begin{center}
+    \fontsize{14}{16}\selectfont
+    \textbf{ABBREVIATIONS AND NOTATIONS}
+\end{center}
+\vspace{0.5cm}
+\doublespacing
+\justifying

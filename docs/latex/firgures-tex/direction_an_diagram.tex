@@ -11,7 +11,8 @@
 
 \begin{document}
 \begin{tikzpicture}[
-    node distance=0.8cm and 1.75cm,
+    node distance=0.5cm and 1.2cm,
+    remember picture,
     every node/.style={font=\small},
     input/.style={rectangle, rounded corners, fill=inputcolor, draw=black, text width=2.5cm, text centered, minimum height=0.8cm},
     stem/.style={rectangle, rounded corners, fill=stemcolor, draw=black, text width=3cm, text centered, minimum height=1cm},
@@ -28,8 +29,8 @@
 \node[input, right=of A] (C) {context: batch×7};
 
 % Embedding layer - positioned below inputs
-\node[process, below=0.8cm of A] (B) {TimeEmbedding\\FourierFeatures\\8 frequencies};
-\node[process, below=0.8cm of C] (D) {ContextEncoder\\7→128, Tanh};
+\node[process, below=0.5cm of A] (B) {TimeEmbedding\\FourierFeatures\\8 frequencies};
+\node[process, below=0.5cm of C] (D) {ContextEncoder\\7→128, Tanh};
 
 \node[process, below=of B] (E) {t\_emb: batch×N×17};
 \node[process, below=of D] (F) {ctx\_emb: batch×128};
@@ -42,9 +43,9 @@
 \node[stem, below=of I] (J) {latent: batch×N×128};
 
 % Mission branches
-\node[branch, below left=0.8cm and 1.5cm of J] (K1) {TranslationBranch\\128→128→128→6};
+\node[branch, below left=0.5cm and 1.0cm of J] (K1) {TranslationBranch\\128→128→128→6};
 \node[branch, below=of J] (K2) {RotationBranch\\128→256→256→7};
-\node[branch, below right=0.8cm and 1.5cm of J] (K3) {MassBranch\\128→64→1};
+\node[branch, below right=0.5cm and 1.0cm of J] (K3) {MassBranch\\128→64→1};
 
 % Branch outputs
 \node[process, below=of K1] (L1) {translation: 6D\\\{x,y,z,vx,vy,vz\}};
@@ -57,11 +58,11 @@
 \node[output, below=of N] (O) {state: batch×N×14};
 
 % Physics layer
-\node[physics, below left=2cm and 2cm of O] (P) {Physics Residual Layer\\Autograd-based\\compute\_dynamics};
+\node[physics, below left=1.2cm and 1.5cm of O] (P) {Physics Residual Layer\\finite difference\\compute\_dynamics};
 \node[process, below=of P] (R) {PhysicsResiduals\\ODE residuals};
 
 % Final output
-\node[output, below right=1cm and 2cm of O] (S) {Output\\(state, residuals)};
+\node[output, below right=0.8cm and 1.5cm of O] (S) {Output\\(state, residuals)};
 
 % Arrows
 \draw[arrow] (A) -- (B);
@@ -80,19 +81,21 @@
 \draw[arrow] (K2) -- (L2);
 \draw[arrow] (K3) -- (L3);
 \draw[arrow] (L2) -- (M);
-\draw[arrow] (L1) -- (N);
+\draw[arrow] (L1) -- (N.west);
 \draw[arrow] (M) -- (N);
-\draw[arrow] (L3) -- (N);
+\draw[arrow] (L3) -- (N.east);
 \draw[arrow] (N) -- (O);
 \draw[arrow] (O) -- (P);
 % Arrows from inputs to physics layer - route around sides to avoid crossings
 % Separate endpoints on P.west by using different y-positions
-\draw[arrow] (A) -- ++(-5.25cm,-1.5cm) |- ([yshift=0.3cm]P.west);
+\draw[arrow] (A) -- ++(-4.75cm,-1.2cm) |- ([yshift=0.3cm]P.west);
 \draw[arrow] (Q.south) -- ++(0,0) |- ([yshift=-0.3cm]P.west);
 \draw[arrow] (P) -- (R);
 \draw[arrow] (O) -- (S);
 \draw[arrow] (R) -| (S);
 
+% Add padding to ensure everything fits within the bounding box
+\useasboundingbox ([shift={(-0.5cm,-0.5cm)}]current bounding box.south west) rectangle ([shift={(0.5cm,0.5cm)}]current bounding box.north east);
+
 \end{tikzpicture}
 \end{document}
-
