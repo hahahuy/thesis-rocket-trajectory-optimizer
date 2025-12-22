@@ -1,0 +1,84 @@
+\documentclass[12pt,twoside]{report}
+\usepackage{fontspec}
+\setmainfont[Ligatures=TeX]{Times New Roman}
+
+% Optional packages for formatting:
+% Set header and footer 0.5in from top/bottom (and 1in side margins)
+\usepackage[top=0.5in,bottom=0.5in,left=1.5in,right=1.5in,includehead,includefoot]{geometry}
+\usepackage{graphicx}             % For including images (logo)
+\usepackage{setspace}             % For line spacing if needed
+\usepackage{ragged2e}            % For better text alignment control
+\usepackage{fancyhdr}             % For custom headers and footers
+\usepackage{amsmath,amssymb}      % For math symbols including \mathbb
+\usepackage{booktabs}             % For professional tables (\toprule, \midrule, \bottomrule)
+\usepackage[style=numeric,backend=biber]{biblatex} % For bibliography
+\usepackage{titlesec}
+\usepackage{caption}              % For customizing captions
+\addbibresource{references.bib}  % Bibliography file
+
+% Set up page numbering: left for odd pages, right for even pages
+\pagestyle{fancy}
+\fancyhf{} % Clear all headers and footers
+\fancyfoot[C]{\thepage} % Page number in the center of the page
+%\fancyfoot[LO]{\thepage} % Page number on left for odd pages
+%\fancyfoot[RE]{\thepage} % Page number on right for even pages
+\renewcommand{\headrulewidth}{0pt} % Remove header rule
+\renewcommand{\footrulewidth}{0pt} % Remove footer rule
+
+%Chapter style
+\titleformat{\chapter}[display]
+  {\normalfont\bfseries\centering\fontsize{14}{16}\selectfont}    % style + centered + font size
+  {CHAPTER \Roman{chapter}}        % "CHAPTER I //"
+  {0pt}                               % space between label and title
+  {\MakeUppercase}                    % makes the title (Introduction) uppercase
+
+\titlespacing*{\chapter}{0pt}{0pt}{1.5\baselineskip}  % Reduce spacing: left, before (reduced), after
+
+%Section style: font size 12 + bold
+\titleformat{\section}
+  {\normalfont\fontsize{12}{14}\selectfont\bfseries}  % font size 12, bold
+  {\thesection}                                       % section number
+  {1em}                                               % space between number and title
+  {}                                                  % after title
+
+\titlespacing*{\section}{0pt}{0.5\baselineskip}{0.3\baselineskip}  % Reduce spacing: left, before, after
+
+\titleformat{\subsection}
+  {\normalfont\fontsize{12}{14}\selectfont\bfseries}  % font size 12, bold
+  {\thesubsection}                                    % subsection number
+  {1em}                                               % space between number and title
+  {}                                                  % after title
+
+\titlespacing*{\subsection}{0pt}{0.3\baselineskip}{0.2\baselineskip}  % Reduce spacing: left, before, after
+
+% Make figure labels bold and italic (only the "Figure X:" part, not the caption text)
+\DeclareCaptionFont{bolditalic}{\bfseries\itshape}
+\captionsetup[figure]{
+  labelformat=simple, 
+  labelsep=colon, 
+  labelfont=bolditalic,  % Only "Figure X:" is bold and italic
+  textfont=normalfont,    % Caption text is normal
+  listformat=empty        % List of Figures shows only "Figure X" without caption text
+}
+
+% Make List of Figures show only "Figure X" without caption text
+% Use caption package's listformat option
+\DeclareCaptionListFormat{onlylabel}{#1}
+\captionsetup[figure]{listformat=onlylabel}
+
+\begin{document}
+
+\input{abstract}
+
+\input{introduction}
+
+\input{materials_methods}
+
+\input{result}
+
+\input{discussion}
+
+\input{conclusion}
+
+\end{document}
+

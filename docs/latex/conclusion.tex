@@ -1,0 +1,104 @@
+\chapter{Conclusion and recommendations}
+\section{Conclusions}
+This thesis investigated whether a structured physics-informed neural 
+network can function as a surrogate model for rocket ascent dynamics 
+and be embedded within a trajectory optimization context. The study was 
+motivated by the computational cost and limited flexibility of classical 
+optimal control solvers when repeated trajectory evaluations or gradient 
+information are required.
+
+The results support the conclusion that physics-informed neural networks 
+constitute a viable surrogate modeling approach for rocket ascent 
+dynamics when the governing equations are well understood and training 
+data are available. By embedding the equations of motion directly into 
+the learning objective, the proposed model is able to reconstruct 
+full-state trajectories that are globally consistent with the reference 
+dynamics without relying on explicit numerical integration during 
+inference. This confirms the central hypothesis that physics guidance can 
+significantly improve the reliability of neural surrogates compared to 
+purely data-driven models.
+
+In line with prior work on physics-informed learning, the study shows that 
+state variables governed primarily by integral effects are captured more 
+robustly than derivative-dominated quantities. This observation is 
+consistent with findings reported by Raissi et al. and Karniadakis et al., 
+where PINNs were shown to approximate smooth solution manifolds 
+effectively while remaining sensitive to higher-order dynamics. The 
+present work extends these insights to a six-degree-of-freedom rocket 
+ascent problem with coupled translational, rotational, and mass dynamics.
+
+At the same time, the thesis demonstrates that soft enforcement of physical 
+constraints is insufficient to guarantee strict compliance with 
+non-negotiable physical laws such as mass monotonicity and symmetry 
+preservation. While the model learns the overall structure of propellant 
+consumption and orientation dynamics, local violations remain possible when 
+constraint satisfaction competes with data fidelity. This aligns with 
+recent theoretical analyses of PINN optimization behavior, which emphasize 
+the trade-off between loss terms and the absence of hard guarantees in 
+penalty-based formulations.
+
+Overall, the findings indicate that physics-informed neural networks are well 
+suited as analysis and optimization surrogates, rather than direct 
+replacements for high-fidelity simulators in safety-critical applications. 
+Their value lies in enabling differentiable, computationally efficient 
+approximations that preserve the dominant physical behavior of complex dynamical 
+systems.
+
+\section{Implications for Trajectory Optimization and Scientific Machine Learning}
+
+From a trajectory optimization perspective, the proposed surrogate 
+framework offers a promising pathway toward reducing reliance on repeated 
+numerical integration in gradient-based optimization loops. The 
+differentiable nature of the model enables direct sensitivity analysis 
+with respect to initial conditions or control parameters, which is 
+difficult to achieve efficiently with traditional solvers.
+
+Within the broader context of scientific machine learning, this work 
+reinforces the view that architectural structure and loss design are as 
+important as network capacity. The observed behavior of the model 
+highlights the need for careful alignment between physical constraints, 
+training objectives, and the intended downstream use of the surrogate. 
+The study thus contributes practical evidence to ongoing discussions in 
+the PINN literature regarding robustness, constraint enforcement, and 
+long-horizon prediction.
+
+\section{Recommendations for Future Work}
+
+Based on the conclusions drawn from this study, several recommendations 
+are proposed for future research and practical development.
+
+First, future models should incorporate hard or semi-hard constraint 
+enforcement mechanisms for critical physical laws, particularly mass 
+monotonicity and symmetry conditions. Projection methods, constrained 
+output parameterizations, or hybrid solver-network approaches may provide 
+stronger physical guarantees than penalty-based losses alone.
+
+Second, phase-aware or adaptive training strategies are recommended to 
+address regions of rapid dynamic change, such as engine cutoff or thrust 
+transitions. Dynamically adjusting loss weights or introducing curriculum 
+learning could improve derivative accuracy without sacrificing global 
+trajectory consistency.
+
+Third, extending the framework to variable time horizons and non-nominal 
+flight conditions, including wind disturbances or parameter uncertainty, 
+would significantly enhance its applicability to real-world scenarios. 
+Such extensions would also provide a more rigorous test of generalization 
+beyond the training regime.
+
+Finally, integration with real flight data or higher-fidelity simulation 
+environments is recommended to evaluate robustness and practical relevance. 
+Combining physics-informed learning with data assimilation techniques may 
+offer a path toward hybrid models capable of bridging the gap between simulation 
+and operational deployment.
+
+\section{Final Remarks}
+This thesis demonstrates that physics-informed neural networks can serve as 
+meaningful surrogate models for rocket ascent dynamics when designed and 
+evaluated carefully. While the approach does not eliminate the need for 
+classical simulation tools, it provides a complementary methodology that
+supports fast evaluation, differentiability, and physical consistency.
+
+The insights gained from this work underscore both the potential and the 
+limitations of PINN-based surrogates, offering a foundation for future 
+research aimed at integrating machine learning more deeply into aerospace 
+trajectory analysis and optimization workflows.

@@ -1,0 +1,149 @@
+\chapter{DISCUSSION AND IMPLICATIONS}
+
+
+\section{Overall Performance of the Physics-Informed Model}
+
+The results demonstrate that the proposed Physics-Informed Neural Network is capable 
+of reconstructing the global structure of rocket trajectories when evaluated on unseen 
+test cases. The model successfully captures the dominant trends of vertical position, 
+velocity, and mass evolution without explicit access to control inputs during inference. 
+This confirms that embedding physical laws directly into the learning objective provides 
+sufficient inductive bias for trajectory reconstruction in high-dimensional dynamical 
+systems.
+
+The close agreement observed in vertical position throughout the ascent phase indicates 
+that the network effectively learns the integral effects of acceleration and thrust over 
+time. This aligns with established findings in physics-informed learning, where state 
+variables governed by smooth integral dynamics tend to be reconstructed more accurately 
+than their time derivatives.
+
+At the same time, deviations observed toward the end of the trajectory suggest that 
+accumulated error remains a challenge, particularly in long-horizon predictions. This 
+behavior is consistent with prior PINN studies applied to nonlinear ordinary differential 
+equations, where error propagation becomes more pronounced as the temporal distance from the 
+initial condition increases.
+
+\section{Interpretation of Velocity and Higher-Order Dynamics}
+The vertical velocity results reveal larger discrepancies compared to position, especially 
+during later stages of flight. This outcome is expected, as velocity depends directly on 
+first-order derivatives of the network output with respect to time. In physics-informed 
+models, derivative-based quantities are more sensitive to approximation error and numerical 
+stiffness.
+
+The divergence observed in the predicted velocity near the terminal time suggests that the 
+network prioritizes global trajectory consistency over local derivative accuracy. This 
+trade-off reflects a known characteristic of PINNs, where minimizing a combined data and 
+physics loss does not guarantee uniform accuracy across all state derivatives.
+
+From a physical perspective, velocity dynamics are influenced by rapidly changing forces, 
+including thrust cutoff and mass variation. Capturing these transitions accurately requires 
+either increased temporal resolution or stronger enforcement of the governing equations 
+during these phases. The present implementation demonstrates reasonable performance but 
+indicates that velocity prediction remains a limiting factor for precise trajectory reconstruction.
+
+\section{Mass Evolution and Constraints Enforcement}
+
+The mass evolution results show that the network learns the general trend of propellant 
+consumption during the burn phase and the constant-mass regime after cutoff. However, 
+small oscillations around the terminal mass and multiple monotonicity violations are observed 
+in the predicted trajectory.
+
+These violations indicate that while the mass conservation law is included as a physics 
+residual, it is not enforced as a hard constraint. As a result, the model allows small 
+physically inconsistent fluctuations if they reduce the overall loss. This behavior highlights 
+an important limitation of soft constraint enforcement in PINNs.
+
+In practical aerospace applications, mass monotonicity is a non-negotiable physical constraint. 
+The current results suggest that additional structural constraints or post-processing steps 
+are necessary if the model is to be deployed in safety-critical settings. Nonetheless, the 
+ability of the network to approximate the mass profile without explicit integration 
+demonstrates the flexibility of the physics-informed approach.
+
+\section{Horizontal Drift and Symmetry Breaking}
+
+The horizontal position results reveal small but persistent deviations from the reference 
+trajectory, which remains identically zero. This indicates that the network does not 
+strictly preserve symmetry in unconstrained dimensions.
+
+Such drift is a known phenomenon in neural differential equation models, particularly 
+when the governing equations admit trivial solutions. In the absence of explicit penalties 
+or symmetry-enforcing constraints, the optimizer may converge to nearby solutions that 
+satisfy the loss function but violate problem-specific invariances.
+
+From a modeling standpoint, this observation suggests that additional regularization terms 
+or coordinate-specific constraints may be required when zero-motion states are physically 
+expected. Alternatively, reparameterizing the model to exclude irrelevant degrees of freedom 
+could reduce spurious predictions and improve robustness.
+
+\section{Quaternion Normalization and Attitude Representation}
+The quaternion norm deviation results indicate that the predicted orientation remains 
+extremely close to unit norm throughout the trajectory. This confirms that the normalization 
+strategy used during training is effective at preserving valid attitude representations.
+
+Maintaining quaternion normalization is critical for rotational dynamics, as even small 
+deviations can lead to non-physical rotations when propagated over time. The present results 
+show that the chosen formulation successfully mitigates this risk without introducing 
+numerical instability.
+
+This outcome aligns with existing literature on learning-based attitude modeling, where 
+explicit normalization or penalty-based approaches are necessary to ensure physically 
+meaningful orientation states.
+
+\section{Physics Residual Behavior and Model Consistency}
+
+The physics residual analysis provides insight into how well the learned solution satisfies 
+the governing equations. The residual magnitudes remain bounded throughout the trajectory 
+and decrease toward the end of the time horizon.
+
+This trend suggests that the network gradually converges toward a solution that is 
+increasingly consistent with the physical model. However, the non-uniform residual profile 
+indicates that constraint satisfaction varies across different flight phases.
+
+Such behavior is typical in PINNs applied to nonlinear systems with time-varying dynamics. 
+Residual dominance may shift between terms depending on the operating regime, highlighting 
+the importance of adaptive loss weighting or curriculum-based training strategies.
+
+\section{Practical Implications and Applicability}
+
+The results indicate that physics-informed neural networks are a viable surrogate modeling 
+approach for rocket trajectory reconstruction. The ability to generate full state trajectories 
+without explicit numerical integration suggests potential applications in rapid simulation, 
+design space exploration, and embedded onboard prediction systems.
+
+However, the observed constraint violations and derivative inaccuracies indicate that the 
+current model is better suited for analysis and approximation rather than direct deployment 
+in control loops. For industrial or mission-critical applications, additional safeguards and 
+validation steps would be required.
+
+The approach remains attractive for scenarios where computational efficiency and differentiability 
+are prioritized, such as optimization, inverse problems, or sensitivity analysis.
+
+\section{Limitations of the Present Study}
+
+Several limitations should be acknowledged. First, the model is evaluated on simulated data 
+generated from the same underlying physics used in training. Generalization to real flight 
+data with unmodeled disturbances remains untested.
+
+Second, constraint enforcement relies entirely on soft penalties, which allows physically 
+inconsistent solutions when trade-offs favor loss minimization. This is particularly evident 
+in mass monotonicity and horizontal drift.
+
+Third, the fixed time horizon and uniform sampling may limit the model’s ability to handle 
+variable-duration flights or abrupt dynamic transitions.
+
+These limitations do not invalidate the results but highlight areas where further development 
+is necessary.
+
+\section{Recommendations for Future Improvements}
+
+Future work should explore hybrid constraint enforcement strategies that combine physics-informed 
+losses with hard constraints or projection-based corrections. Enforcing mass monotonicity and 
+symmetry directly at the architectural level may significantly improve physical consistency.
+
+Adaptive loss weighting and phase-aware training could improve performance during critical 
+dynamic transitions, such as engine cutoff. Additionally, extending the framework to handle 
+variable time horizons and stochastic disturbances would enhance practical applicability.
+
+Incorporating real-world flight data or higher-fidelity aerodynamic models would further 
+test the robustness and generalization capability of the proposed approach.
+

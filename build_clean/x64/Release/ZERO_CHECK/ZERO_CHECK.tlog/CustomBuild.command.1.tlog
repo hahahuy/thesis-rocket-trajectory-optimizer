@@ -1,0 +1,10 @@
+^C:\USERS\HAHUY\DOCUMENTS\GITHUBREPOSITORY\THESIS-ROCKET-TRAJECTORY-OPTIMIZING\BUILD_CLEAN\CMAKEFILES\E761CB11CD1CBFF4FF3EFE70EC96AE6B\GENERATE.STAMP.RULE
+setlocal
+"C:\Program Files\CMake\bin\cmake.exe" -SC:/Users/Hahuy/Documents/GitHubRepository/thesis-rocket-trajectory-optimizing -BC:/Users/Hahuy/Documents/GitHubRepository/thesis-rocket-trajectory-optimizing/build_clean --check-stamp-list CMakeFiles/generate.stamp.list --vs-solution-file C:/Users/Hahuy/Documents/GitHubRepository/thesis-rocket-trajectory-optimizing/build_clean/pinn_rocket_trajectory.sln
+if %errorlevel% neq 0 goto :cmEnd
+:cmEnd
+endlocal & call :cmErrorLevel %errorlevel% & goto :cmDone
+:cmErrorLevel
+exit /b %1
+:cmDone
+if %errorlevel% neq 0 goto :VCEnd

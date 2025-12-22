@@ -205,7 +205,11 @@ I would like to express my sincere gratitude to my supervisor, Dr. Nguyen Quang,
 \end{center}
 \vspace{0.5cm}
 \singlespacing % Use single spacing for list of tables
-\listoftables
+
+\makeatletter
+\@starttoc{lot}  % Print the actual list of tables WITHOUT its own title/page break
+\makeatother
+
 \newpage
 \doublespacing % Restore double spacing for rest of document
 %---------------------------
@@ -219,7 +223,11 @@ I would like to express my sincere gratitude to my supervisor, Dr. Nguyen Quang,
 \end{center}
 \vspace{0.5cm}
 \singlespacing % Use single spacing for list of figures
-\listoffigures
+
+\makeatletter
+\@starttoc{lof}  % Print the actual list of figures WITHOUT its own title/page break
+\makeatother
+
 \newpage
 \doublespacing % Restore double spacing for rest of document
 

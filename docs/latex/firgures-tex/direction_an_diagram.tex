@@ -58,7 +58,7 @@
 \node[output, below=of N] (O) {state: batch×N×14};
 
 % Physics layer
-\node[physics, below left=1.2cm and 1.5cm of O] (P) {Physics Residual Layer\\finite difference\\compute\_dynamics};
+\node[physics, below left=1.2cm and 1.5cm of O, text width=3.5cm, xshift=1.5cm, yshift=0.5cm] (P) {Physics Residual Layer\\finite difference\\compute\_dynamics};
 \node[process, below=of P] (R) {PhysicsResiduals\\ODE residuals};
 
 % Final output

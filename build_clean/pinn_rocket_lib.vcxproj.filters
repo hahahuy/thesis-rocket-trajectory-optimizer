@@ -1,0 +1,31 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<Project ToolsVersion="17.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <ItemGroup>
+    <ClCompile Include="C:\Users\Hahuy\Documents\GitHubRepository\thesis-rocket-trajectory-optimizing\src\utils\io.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="C:\Users\Hahuy\Documents\GitHubRepository\thesis-rocket-trajectory-optimizing\src\physics\aerodynamics\aerodynamics.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="C:\Users\Hahuy\Documents\GitHubRepository\thesis-rocket-trajectory-optimizing\src\physics\environment\earth_rotation.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="C:\Users\Hahuy\Documents\GitHubRepository\thesis-rocket-trajectory-optimizing\src\physics\environment\isa_atmosphere.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="C:\Users\Hahuy\Documents\GitHubRepository\thesis-rocket-trajectory-optimizing\src\physics\propulsion\staging.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="C:\Users\Hahuy\Documents\GitHubRepository\thesis-rocket-trajectory-optimizing\src\physics\dynamics.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+  </ItemGroup>
+  <ItemGroup>
+    <CustomBuild Include="C:\Users\Hahuy\Documents\GitHubRepository\thesis-rocket-trajectory-optimizing\CMakeLists.txt" />
+  </ItemGroup>
+  <ItemGroup>
+    <Filter Include="Source Files">
+      <UniqueIdentifier>{E4CFA181-D116-3A7B-8950-8E843F4D7187}</UniqueIdentifier>
+    </Filter>
+  </ItemGroup>
+</Project>

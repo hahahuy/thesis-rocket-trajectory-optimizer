@@ -1,0 +1,4 @@
+% This is a placeholder file.
+% To generate the actual PDF, compile figures-tex/example_workflow.tex
+% using: .\build.ps1 -TexFile figures-tex/example_workflow.tex -OutputToFigures
+
