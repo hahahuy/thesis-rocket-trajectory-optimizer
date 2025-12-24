@@ -491,25 +491,52 @@ class PINNLoss(nn.Module):
         self,
         state: torch.Tensor,
         t: torch.Tensor,
-        context: torch.Tensor,
+        context: Optional[torch.Tensor],
     ) -> torch.Tensor:
-        v = state[..., 3:6]
-        vz = v[..., 2:3]
-        dvz_dt = self._finite_difference(vz, t)
+        """
+        Reduced-order vertical physics residual using thrust inferred from mass
+        depletion via the rocket equation:
 
-        z = state[..., 2:3]
-        rho = self._compute_density(z)
-        Cd = context[..., 2:3]
-        S_ref = self._get_param("S_ref", 0.05).to(state.device).view(1, 1, 1)
-        mass = state[..., 13:14]
+            m_dot = d m / dt
+            T_eff = - m_dot * Isp * g0
+            dvz/dt ≈ T_eff / m - g0
 
-        drag_acc_z = self._drag_acc_component(vz, rho, Cd, S_ref, mass)
+        This enforces thrust–mass coupling and vertical acceleration plausibility
+        without relying on explicit controls or horizontal dynamics.
+        """
+        # Ensure batched format
+        if state.dim() == 2:
+            state = state.unsqueeze(0)
+            t = t.unsqueeze(0)
+            if context is not None and context.dim() == 2:
+                context = context.unsqueeze(0)
+
+        # Extract mass and vertical velocity
+        mass = state[..., 13:14]  # [batch, N, 1]
+        vz = state[..., 5:6]  # [batch, N, 1]
+
+        # Time derivatives via finite differences
+        m_dot = self._finite_difference(mass, t)  # [batch, N, 1]
+        dvz_dt = self._finite_difference(vz, t)  # [batch, N, 1]
+
+        # Specific impulse from context if available, otherwise from physics params
+        if context is not None:
+            # Context layout: index 1 is Isp in CONTEXT_FIELDS
+            if context.dim() == 2:
+                context = context.unsqueeze(1).expand(state.shape[0], state.shape[1], -1)
+            Isp_ctx = context[..., 1:2]  # [batch, N, 1]
+        else:
+            Isp_ctx = self._get_param("Isp", 300.0).to(state.device).view(1, 1, 1)
 
         g0 = self._get_param("g0", 9.81).to(state.device).view(1, 1, 1)
-        Tmax = context[..., 5:6]
-        thrust_acc = Tmax / mass.clamp_min(self._eps)
-        a_phys = thrust_acc - g0 - drag_acc_z
-        residual = dvz_dt - a_phys
+
+        # Effective thrust history consistent with mass depletion
+        T_eff = -m_dot * Isp_ctx * g0  # [batch, N, 1]
+
+        # Model-predicted vertical acceleration from thrust and gravity
+        a_model = T_eff / mass.clamp_min(self._eps) - g0  # [batch, N, 1]
+
+        residual = dvz_dt - a_model
         return torch.mean(residual ** 2)
 
     def _horizontal_residual_loss(
@@ -537,100 +564,35 @@ class PINNLoss(nn.Module):
         self,
         t: torch.Tensor,
         state: torch.Tensor,
-        control: Optional[torch.Tensor] = None
+        control: Optional[torch.Tensor] = None,
+        context: Optional[torch.Tensor] = None,
     ) -> torch.Tensor:
         """
-        Physics loss: ODE residual norm.
-        
-        Computes ||s_dot - f(s, u, p)||^2 where f is the dynamics function.
-        
-        Args:
-            t: Time [batch, N, 1] or [N, 1]
-            state: State [batch, N, 14] or [N, 14]
-            control: Control [batch, N, 4] or [N, 4] (optional, uses zero if None)
-            
-        Returns:
-            Scalar loss
+        Physics loss: reduced-order vertical residual aligned with training data.
+
+        Enforces only the vertical dynamics relation
+
+            dvz/dt ≈ - (dm/dt) * Isp * g0 / m - g0
+
+        inferred from mass depletion, avoiding horizontal acceleration or full
+        ODE residuals that conflict with unknown controls.
         """
-        # Ensure correct shapes
+        # Ensure batched format
         if state.dim() == 2:
-            state = state.unsqueeze(0)  # [1, N, 14]
-            t = t.unsqueeze(0)  # [1, N, 1]
-            was_unbatched = True
-        else:
-            was_unbatched = False
-        
-        batch_size, N, state_dim = state.shape
-        
-        # Compute numerical derivative: ds/dt
-        # Use central difference for interior points, forward/backward for boundaries
-        # Work with [batch, N, state_dim] shape for correct indexing
-        state_dot_numerical = torch.zeros_like(state)  # [batch, N, state_dim]
-        
-        # Extract time values per batch (assuming uniform time grid per batch)
-        # t is [batch, N, 1], extract first batch's time for dt calculation
-        t_batch0 = t[0, :, 0]  # [N] - time grid for first batch (should be same for all)
-        
-        for i in range(N):
-            if i == 0:
-                # Forward difference at first time step
-                if N > 1:
-                    dt = (t_batch0[i+1] - t_batch0[i]).item()
-                    state_dot_numerical[:, i, :] = (
-                        state[:, i+1, :] - state[:, i, :]
-                    ) / (dt + 1e-12)
-                else:
-                    state_dot_numerical[:, i, :] = 0.0
-            elif i == N - 1:
-                # Backward difference at last time step
-                dt = (t_batch0[i] - t_batch0[i-1]).item()
-                state_dot_numerical[:, i, :] = (
-                    state[:, i, :] - state[:, i-1, :]
-                ) / (dt + 1e-12)
-            else:
-                # Central difference for interior points
-                dt = (t_batch0[i+1] - t_batch0[i-1]).item()
-                state_dot_numerical[:, i, :] = (
-                    state[:, i+1, :] - state[:, i-1, :]
-                ) / (dt + 1e-12)
-        
-        # Flatten for dynamics computation
-        state_flat = state.view(-1, state_dim)  # [batch*N, 14]
-        state_dot_numerical_flat = state_dot_numerical.view(-1, state_dim)  # [batch*N, 14]
-        
-        # Prepare control (use zero if not provided)
-        # NOTE: Processed datasets (WP3) do not include control trajectories.
-        # This is intentional: the PINN learns to predict states without explicit control,
-        # as control is implicitly encoded in the trajectory. In WP5, control will become
-        # an explicit model input for optimization. See WP4 docs for details.
-        if control is None:
-            # Default control: [T=0, theta_g=0, phi_g=0, delta=0] (zero thrust, no gimbal)
-            control_flat = torch.zeros(batch_size * N, 4, device=state.device, dtype=state.dtype)
-        else:
-            if control.dim() == 2:
-                control = control.unsqueeze(0)
-            control_flat = control.view(-1, 4)
-        
-        # Move params to correct device
-        params_device = {
-            k: v.to(state.device) for k, v in self._params_tensors.items()
-        }
-        
-        # Compute dynamics: f(s, u, p)
-        state_dot_dynamics = compute_dynamics(
-            state_flat,
-            control_flat,
-            params_device,
-            self.scales
-        )  # [batch*N, 14]
-        
-        # Residual: r = ds/dt_numerical - f(s, u, p)
-        residual = state_dot_numerical_flat - state_dot_dynamics
-        
-        # Loss: mean squared residual
-        loss = torch.mean(residual ** 2)
-        
-        return loss
+            state = state.unsqueeze(0)
+            t = t.unsqueeze(0)
+            if context is not None and context.dim() == 2:
+                context = context.unsqueeze(0)
+
+        batch_size, N, _ = state.shape
+
+        context_broadcast = None
+        if context is not None:
+            context_broadcast = self._broadcast_context(
+                context, batch_size, N, state.device
+            )
+
+        return self._vertical_residual_loss(state, t, context_broadcast)
     
     def quaternion_normalization_loss(
         self,
@@ -760,60 +722,18 @@ class PINNLoss(nn.Module):
             (total_loss, loss_dict) where loss_dict contains component losses
         """
         L_data = self.data_loss(pred_state, true_state)
-        L_phys = self.physics_loss(t, pred_state, control)
+        L_phys = self.physics_loss(t, pred_state, control, context=context)
         L_bc = self.boundary_loss(pred_state, true_state, t)
         
         # Enhanced loss components
         L_quat_norm = self.quaternion_normalization_loss(pred_state)
         L_mass_flow = self.mass_flow_consistency_loss(pred_state, t)
 
-        context_broadcast = None
-        if context is not None and (
-            self.lambda_mass_residual > 0
-            or self.lambda_vz_residual > 0
-            or self.lambda_vxy_residual > 0
-        ):
-            batch_size = pred_state.shape[0] if pred_state.dim() == 3 else 1
-            N = pred_state.shape[1] if pred_state.dim() == 3 else pred_state.shape[0]
-            context_broadcast = self._broadcast_context(
-                context, batch_size, N, pred_state.device
-            )
-
-        L_mass_residual = torch.tensor(0.0, device=pred_state.device)
-        L_vz_residual = torch.tensor(0.0, device=pred_state.device)
-        L_vxy_residual = torch.tensor(0.0, device=pred_state.device)
+        # Optional smoothing / consistency terms (kept as light regularization)
         L_smooth_z = torch.tensor(0.0, device=pred_state.device)
         L_smooth_vz = torch.tensor(0.0, device=pred_state.device)
         L_pos_vel = torch.tensor(0.0, device=pred_state.device)
         L_smooth_pos = torch.tensor(0.0, device=pred_state.device)
-        L_zero_vxy = torch.tensor(0.0, device=pred_state.device)
-        L_zero_axy = torch.tensor(0.0, device=pred_state.device)
-        L_hacc = torch.tensor(0.0, device=pred_state.device)
-        L_xy_zero = torch.tensor(0.0, device=pred_state.device)
-
-        if (
-            self.lambda_mass_residual > 0.0
-            and context_broadcast is not None
-        ):
-            L_mass_residual = self._mass_residual_loss(
-                pred_state, t, context_broadcast
-            )
-
-        if (
-            self.lambda_vz_residual > 0.0
-            and context_broadcast is not None
-        ):
-            L_vz_residual = self._vertical_residual_loss(
-                pred_state, t, context_broadcast
-            )
-
-        if (
-            self.lambda_vxy_residual > 0.0
-            and context_broadcast is not None
-        ):
-            L_vxy_residual = self._horizontal_residual_loss(
-                pred_state, t, context_broadcast
-            )
 
         if self.lambda_smooth_z > 0.0:
             L_smooth_z = self._second_difference(pred_state[..., 2:3])
@@ -827,35 +747,16 @@ class PINNLoss(nn.Module):
         if self.lambda_smooth_pos > 0.0:
             L_smooth_pos = self._position_smoothing_loss(pred_state)
 
-        if self.lambda_zero_vxy > 0.0:
-            L_zero_vxy = self._zero_horizontal_velocity_loss(pred_state, true_state)
-
-        if self.lambda_zero_axy > 0.0:
-            L_zero_axy = self._zero_horizontal_acceleration_loss(pred_state, true_state, t)
-
-        if self.lambda_hacc > 0.0:
-            L_hacc = self._global_horizontal_acceleration_loss(pred_state, t)
-
-        if self.lambda_xy_zero > 0.0:
-            L_xy_zero = self._xy_zero_position_loss(pred_state, true_state)
-        
         total_loss = (
             self.lambda_data * L_data
             + self.lambda_phys * L_phys
             + self.lambda_bc * L_bc
             + self.lambda_quat_norm * L_quat_norm
             + self.lambda_mass_flow * L_mass_flow
-            + self.lambda_mass_residual * L_mass_residual
-            + self.lambda_vz_residual * L_vz_residual
-            + self.lambda_vxy_residual * L_vxy_residual
             + self.lambda_smooth_z * L_smooth_z
             + self.lambda_smooth_vz * L_smooth_vz
             + self.lambda_pos_vel * L_pos_vel
             + self.lambda_smooth_pos * L_smooth_pos
-            + self.lambda_zero_vxy * L_zero_vxy
-            + self.lambda_zero_axy * L_zero_axy
-            + self.lambda_hacc * L_hacc
-            + self.lambda_xy_zero * L_xy_zero
         )
         
         loss_dict = {
@@ -865,17 +766,10 @@ class PINNLoss(nn.Module):
             "boundary": L_bc,
             "quat_norm": L_quat_norm,
             "mass_flow": L_mass_flow,
-            "mass_residual": L_mass_residual,
-            "vz_residual": L_vz_residual,
-            "vxy_residual": L_vxy_residual,
             "smooth_z": L_smooth_z,
             "smooth_vz": L_smooth_vz,
             "pos_vel": L_pos_vel,
             "smooth_pos": L_smooth_pos,
-            "zero_vxy": L_zero_vxy.detach(),
-            "zero_axy": L_zero_axy.detach(),
-            "hacc": L_hacc.detach(),
-            "xy_zero": L_xy_zero.detach(),
         }
         
         return total_loss, loss_dict

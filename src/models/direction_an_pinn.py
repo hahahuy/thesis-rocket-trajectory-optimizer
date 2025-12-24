@@ -9,7 +9,7 @@ High-level layout (must be kept in this order):
    - Modules: Fourier feature embedding + MLP with residual connections
    - Output: latent feature vector z
 2. Mission branches:
-   - Translation branch:   z -> [x, y, z, vx, vy, vz]
+   - Translation branch:   z -> [vx, vy, z, vz]  (x,y via velocity integration)
    - Rotation branch:      z -> [q0, q1, q2, q3, wx, wy, wz]
    - Mass / auxiliary:     z -> [m] (optional auxiliary branch)
 3. Physics layer:
@@ -36,7 +36,12 @@ import torch
 import torch.nn as nn
 
 from .architectures import FourierFeatures, ContextEncoder, normalize_quaternion
-from .branches import TranslationBranch, RotationBranch, MassBranch
+from .branches import (
+    TranslationBranchReducedXYFree,
+    RotationBranch,
+    MassBranch,
+    MonotonicMassBranch,
+)
 from src.physics.physics_residual_layer import PhysicsResidualLayer, PhysicsResiduals
 from .input_block_v2 import InputBlockV2
 
@@ -169,7 +174,7 @@ class DirectionANPINN(nn.Module):
     Direction AN: Shared stem + mission branches + physics residual layer.
 
     - Shared stem: `ANSharedStem`
-    - Translation branch: position + velocity
+    - Translation branch: [vx, vy, z, vz] (x,y reconstructed by integration)
     - Rotation branch: quaternion + angular rates
     - Mass branch: scalar mass
     - Physics layer: `PhysicsResidualLayer`
@@ -211,7 +216,8 @@ class DirectionANPINN(nn.Module):
         )
 
         # 2. Mission branches
-        self.translation_branch = TranslationBranch(
+        # Translation branch predicts [vx, vy, z, vz]; x,y reconstructed by integration.
+        self.translation_branch = TranslationBranchReducedXYFree(
             hidden_dim=stem_hidden_dim,
             branch_dims=translation_branch_dims or [128, 128],
             activation=activation,
@@ -223,7 +229,8 @@ class DirectionANPINN(nn.Module):
             activation=activation,
             dropout=dropout,
         )
-        self.mass_branch = MassBranch(
+        # Monotonic mass branch: m(t) always non-increasing, structurally enforced.
+        self.mass_branch = MonotonicMassBranch(
             hidden_dim=stem_hidden_dim,
             branch_dims=mass_branch_dims or [64],
             activation=activation,
@@ -269,24 +276,69 @@ class DirectionANPINN(nn.Module):
             context = context.unsqueeze(0) if context.dim() == 2 else context
 
         # 2. Mission branches (independent subnetworks)
-        trans_out = self.translation_branch(latent)  # [batch, N, 6]
+        trans_out = self.translation_branch(latent)  # [batch, N, 4] -> [vx, vy, z, vz]
         rot_out = self.rotation_branch(latent)  # [batch, N, 7]
-        mass_out = self.mass_branch(latent)  # [batch, N, 1]
+        # Extract m0 and mdry from (normalized) context vector
+        if context.dim() == 3:
+            context_base = context[:, 0, :]
+        else:
+            context_base = context
+        m0_ctx = context_base[:, 0:1]  # "m0" (index 0 in CONTEXT_FIELDS)
+        
+        # mdry might not be in context (depends on dataset), use default or extract if available
+        context_dim = context_base.shape[-1]
+        if context_dim > 8:
+            mdry_ctx = context_base[:, 8:9]  # "mdry" (index 8 in CONTEXT_FIELDS)
+        else:
+            # mdry not in context, use a default normalized value (mdry ≈ 0.7 * m0 typically)
+            # For normalized context, use a reasonable default
+            mdry_ctx = m0_ctx * 0.7  # Approximate: mdry ≈ 0.7 * m0
+        
+        m0 = m0_ctx.unsqueeze(1)  # [batch, 1, 1]
+        mdry = mdry_ctx.unsqueeze(1)  # [batch, 1, 1]
+        mass_out = self.mass_branch(latent, m0)  # [batch, N, 1], structurally decreasing
+        mass_out = torch.clamp(mass_out, min=mdry)  # Enforce lower bound m_dry
 
         # Split rotation into quaternion + angular rates and normalize quaternion
         q_pred = rot_out[..., :4]  # [batch, N, 4]
         w_pred = rot_out[..., 4:]  # [batch, N, 3]
         q_pred = normalize_quaternion(q_pred)
 
-        # Translation split
-        x_pred = trans_out[..., :3]  # [batch, N, 3]
-        v_pred = trans_out[..., 3:]  # [batch, N, 3]
+        # Translation split: [vx, vy, z, vz]
+        vx_pred = trans_out[..., 0:1]  # [batch, N, 1]
+        vy_pred = trans_out[..., 1:2]  # [batch, N, 1]
+        z_pred = trans_out[..., 2:3]  # [batch, N, 1]
+        vz_pred = trans_out[..., 3:4]  # [batch, N, 1]
+
+        # Deterministic horizontal position reconstruction via velocity integration.
+        # Assumes uniform time grid; dt taken from first interval.
+        batch_size, N, _ = latent.shape
+        if t_model.dim() == 2:
+            t_for_dt = t_model.unsqueeze(0)
+        else:
+            t_for_dt = t_model
+        if N > 1:
+            dt_scalar = (t_for_dt[:, 1, 0] - t_for_dt[:, 0, 0]).view(batch_size, 1, 1)
+        else:
+            dt_scalar = torch.ones(
+                batch_size, 1, 1, device=latent.device, dtype=latent.dtype
+            )
+
+        # Use left-point rule with x(0)=y(0)=0 enforced exactly.
+        zero_pad = torch.zeros_like(vx_pred[:, 0:1, :])
+        vx_for_int = torch.cat([zero_pad, vx_pred[:, :-1, :]], dim=1)
+        vy_for_int = torch.cat([zero_pad, vy_pred[:, :-1, :]], dim=1)
+        x_pred = torch.cumsum(vx_for_int, dim=1) * dt_scalar
+        y_pred = torch.cumsum(vy_for_int, dim=1) * dt_scalar
+
+        v_pred = torch.cat([vx_pred, vy_pred, vz_pred], dim=-1)  # [batch, N, 3]
+        pos_pred = torch.cat([x_pred, y_pred, z_pred], dim=-1)  # [batch, N, 3]
 
         # Pack final state
         state = torch.cat(
-            [x_pred, v_pred, q_pred, w_pred, mass_out],
+            [pos_pred, v_pred, q_pred, w_pred, mass_out],
             dim=-1,
-        )  # [batch, N, 14]
+        )  # [batch, N, 14], with x,y reconstructed via integration
 
         # 3. Physics residuals (autograd-based)
         residuals = self.physics_layer(t_model, state, control=control)
@@ -375,7 +427,8 @@ class DirectionANPINN_AN1(nn.Module):
             self.stem_mlp = None
         
         # Mission branches (same as AN)
-        self.translation_branch = TranslationBranch(
+        # Translation branch predicts [vx, vy, z, vz]; x,y reconstructed by integration.
+        self.translation_branch = TranslationBranchReducedXYFree(
             hidden_dim=stem_hidden_dim,
             branch_dims=translation_branch_dims or [128, 128],
             activation=activation,
@@ -387,7 +440,8 @@ class DirectionANPINN_AN1(nn.Module):
             activation=activation,
             dropout=dropout,
         )
-        self.mass_branch = MassBranch(
+        # Monotonic mass branch: m(t) always non-increasing, structurally enforced.
+        self.mass_branch = MonotonicMassBranch(
             hidden_dim=stem_hidden_dim,
             branch_dims=mass_branch_dims or [64],
             activation=activation,
@@ -479,26 +533,71 @@ class DirectionANPINN_AN1(nn.Module):
             latent = latent.unsqueeze(0)
             t = t.unsqueeze(0) if t.dim() == 2 else t
             context = context.unsqueeze(0) if context.dim() == 2 else context
-        
+
         # Mission branches (independent subnetworks)
-        trans_out = self.translation_branch(latent)  # [batch, N, 6]
+        trans_out = self.translation_branch(latent)  # [batch, N, 4] -> [vx, vy, z, vz]
         rot_out = self.rotation_branch(latent)  # [batch, N, 7]
-        mass_out = self.mass_branch(latent)  # [batch, N, 1]
+        # Extract m0 and mdry from (normalized) context vector
+        if context.dim() == 3:
+            context_base = context[:, 0, :]
+        else:
+            context_base = context
+        m0_ctx = context_base[:, 0:1]  # "m0" (index 0 in CONTEXT_FIELDS)
+        
+        # mdry might not be in context (depends on dataset), use default or extract if available
+        context_dim = context_base.shape[-1]
+        if context_dim > 8:
+            mdry_ctx = context_base[:, 8:9]  # "mdry" (index 8 in CONTEXT_FIELDS)
+        else:
+            # mdry not in context, use a default normalized value (mdry ≈ 0.7 * m0 typically)
+            # For normalized context, use a reasonable default
+            mdry_ctx = m0_ctx * 0.7  # Approximate: mdry ≈ 0.7 * m0
+        
+        m0 = m0_ctx.unsqueeze(1)  # [batch, 1, 1]
+        mdry = mdry_ctx.unsqueeze(1)  # [batch, 1, 1]
+        mass_out = self.mass_branch(latent, m0)  # [batch, N, 1], structurally decreasing
+        mass_out = torch.clamp(mass_out, min=mdry)  # Enforce lower bound m_dry
         
         # Split rotation into quaternion + angular rates and normalize quaternion
         q_pred = rot_out[..., :4]  # [batch, N, 4]
         w_pred = rot_out[..., 4:]  # [batch, N, 3]
         q_pred = normalize_quaternion(q_pred)
         
-        # Translation split
-        x_pred = trans_out[..., :3]  # [batch, N, 3]
-        v_pred = trans_out[..., 3:]  # [batch, N, 3]
-        
+        # Translation split: [vx, vy, z, vz]
+        vx_pred = trans_out[..., 0:1]  # [batch, N, 1]
+        vy_pred = trans_out[..., 1:2]  # [batch, N, 1]
+        z_pred = trans_out[..., 2:3]  # [batch, N, 1]
+        vz_pred = trans_out[..., 3:4]  # [batch, N, 1]
+
+        # Deterministic horizontal position reconstruction via velocity integration.
+        # Assumes uniform time grid; dt taken from first interval.
+        batch_size, N, _ = latent.shape
+        if t.dim() == 2:
+            t_for_dt = t.unsqueeze(0)
+        else:
+            t_for_dt = t
+        if N > 1:
+            dt_scalar = (t_for_dt[:, 1, 0] - t_for_dt[:, 0, 0]).view(batch_size, 1, 1)
+        else:
+            dt_scalar = torch.ones(
+                batch_size, 1, 1, device=latent.device, dtype=latent.dtype
+            )
+
+        # Use left-point rule with x(0)=y(0)=0 enforced exactly.
+        zero_pad = torch.zeros_like(vx_pred[:, 0:1, :])
+        vx_for_int = torch.cat([zero_pad, vx_pred[:, :-1, :]], dim=1)
+        vy_for_int = torch.cat([zero_pad, vy_pred[:, :-1, :]], dim=1)
+        x_pred = torch.cumsum(vx_for_int, dim=1) * dt_scalar
+        y_pred = torch.cumsum(vy_for_int, dim=1) * dt_scalar
+
+        v_pred = torch.cat([vx_pred, vy_pred, vz_pred], dim=-1)  # [batch, N, 3]
+        pos_pred = torch.cat([x_pred, y_pred, z_pred], dim=-1)  # [batch, N, 3]
+
         # Pack final state
         state = torch.cat(
-            [x_pred, v_pred, q_pred, w_pred, mass_out],
+            [pos_pred, v_pred, q_pred, w_pred, mass_out],
             dim=-1,
-        )  # [batch, N, 14]
+        )  # [batch, N, 14], with x,y reconstructed via integration
         
         # Physics residuals (finite-difference based)
         residuals = self.physics_layer(t, state, control=control)

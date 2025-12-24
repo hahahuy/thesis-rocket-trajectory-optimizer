@@ -1,0 +1,57 @@
+loss:
+  component_weights:
+    m: 4.0
+    vz: 2.0
+    z: 2.0
+  homotopy_schedule: fixed
+  lambda_bc: 1.0
+  lambda_data: 1.0
+  lambda_mass: 1.0
+  lambda_mass_flow: 0.0
+  lambda_phys: 0.1
+  lambda_phys_final: 1.0
+  lambda_pos_vel: 0.5
+  lambda_quat_norm: 0.0
+  lambda_rotation: 1.0
+  lambda_smooth_pos: 0.0
+  lambda_smooth_vz: 5.0e-05
+  lambda_smooth_z: 0.0001
+  lambda_translation: 1.0
+  phase_schedule:
+    enabled: false
+  type: PINNLoss
+model:
+  activation: tanh
+  dropout: 0.0
+  fourier_features: 8
+  layer_norm: true
+  mass_branch_dims:
+  - 64
+  rotation_branch_dims:
+  - 256
+  - 256
+  stem_hidden_dim: 128
+  stem_layers: 4
+  translation_branch_dims:
+  - 128
+  - 128
+  type: direction_an
+physics_config: configs/phys.yaml
+scales_config: configs/scales.yaml
+train:
+  batch_size: 8
+  early_stopping_min_delta: 0.0
+  early_stopping_patience: 30
+  early_stopping_patience_phase2: 50
+  epochs: 200
+  experiment_name: direction_an_fixed
+  learning_rate: 1e-3
+  num_workers: 0
+  scheduler:
+    kwargs:
+      T_max: 200
+      eta_min: 1e-6
+    type: cosine
+  time_subsample: null
+  use_v2_dataloader: false
+  weight_decay: 1e-5

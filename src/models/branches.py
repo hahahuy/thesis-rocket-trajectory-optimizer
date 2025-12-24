@@ -18,6 +18,12 @@ class TranslationBranch(nn.Module):
     Dedicated branch for translation (position + velocity).
 
     Output: [x, y, z, vx, vy, vz] (6D)
+
+    NOTE:
+        This branch is used by architectures that predict full translation
+        state directly. Direction AN/AN1/AN2 use a reduced translation head
+        (`TranslationBranchReducedXYFree`) that removes x,y from the neural
+        output space and reconstructs them via velocity integration.
     """
 
     def __init__(
@@ -58,6 +64,64 @@ class TranslationBranch(nn.Module):
 
         Returns:
             translation: [..., 6] or [batch, N, 6]
+        """
+        return self.net(z)
+
+
+class TranslationBranchReducedXYFree(nn.Module):
+    """
+    [PINN_V2][2025-12-24][AN Architecture Update]
+    Translation branch that predicts only horizontal velocities and vertical
+    position/velocity.
+
+    Output: [vx, vy, z, vz] (4D)
+
+    Design intent:
+        - Remove x, y from the neural output space
+        - Enforce x(t), y(t) via deterministic integration of vx, vy
+        - Reduce redundant degrees of freedom and stabilize position
+          reconstruction
+    """
+
+    def __init__(
+        self,
+        hidden_dim: int = 128,
+        branch_dims: list = None,
+        activation: str = "gelu",
+        dropout: float = 0.05,
+    ) -> None:
+        super().__init__()
+
+        if branch_dims is None:
+            branch_dims = [128, 128]
+
+        dims = [hidden_dim] + branch_dims + [4]
+
+        layers = []
+        for i in range(len(dims) - 1):
+            layers.append(nn.Linear(dims[i], dims[i + 1]))
+            if i < len(dims) - 2:  # No activation on output
+                if activation == "gelu":
+                    layers.append(nn.GELU())
+                elif activation == "tanh":
+                    layers.append(nn.Tanh())
+                elif activation == "relu":
+                    layers.append(nn.ReLU())
+                else:
+                    raise ValueError(f"Unknown activation: {activation}")
+                if dropout > 0.0:
+                    layers.append(nn.Dropout(dropout))
+
+        self.net = nn.Sequential(*layers)
+
+    def forward(self, z: torch.Tensor) -> torch.Tensor:
+        """
+        Args:
+            z: Shared embedding [..., hidden_dim] or [batch, N, hidden_dim]
+
+        Returns:
+            translation_reduced: [..., 4] or [batch, N, 4]
+                [vx, vy, z, vz]
         """
         return self.net(z)
 

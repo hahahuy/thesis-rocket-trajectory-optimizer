@@ -506,9 +506,9 @@ graph TD
     style AE fill:#c8e6c9,color:#000000
 ```
 
-## Direction AN: Shared Stem + Mission Branches + Physics Residuals
+## Direction AN: Shared Stem + Mission Branches + Physics-Guided Surrogate
 
-Shared stem with residual MLP, independent mission branches, and physics residual layer that computes residuals using autograd.
+Shared stem with residual MLP, reduced translation head with x/y integration, monotonic mass branch, and physics residuals used in a vertical-only loss.
 
 ```mermaid
 graph TD
@@ -522,26 +522,39 @@ graph TD
     H --> I["ANSharedStem<br/>Residual MLP<br/>4 layers × 128<br/>Tanh, LayerNorm"]
     I --> J["latent: batch×N×128"]
     
-    J --> K1["TranslationBranch<br/>128→128→128→6"]
+    %% Mission branches
+    J --> K1["TranslationBranchReducedXYFree<br/>128→128→128→4<br/>[vx,vy,z,vz]"]
     J --> K2["RotationBranch<br/>128→256→256→7"]
-    J --> K3["MassBranch<br/>128→64→1"]
+    J --> K3["MonotonicMassBranch<br/>128→64→1<br/>m(t) ↓"]
     
-    K1 --> L1["translation: 6D<br/>[x,y,z,vx,vy,vz]"]
-    K2 --> L2["rotation: 7D<br/>[q0,q1,q2,q3,wx,wy,wz]"]
-    K3 --> L3["mass: 1D<br/>[m]"]
+    %% Split outputs
+    K1 --> Lvxvy["vx,vy,z,vz"]
+    K2 --> Lrot["[q0,q1,q2,q3,wx,wy,wz]"]
+    K3 --> Lm["m(t)"]
     
-    L2 --> M["Quaternion Normalization"]
-    L1 --> N["Pack State"]
+    %% x,y integration from velocities
+    Lvxvy --> INT["Kinematic Integration<br/>x(0)=y(0)=0<br/>x,y = ∫ v_x,v_y dt"]
+    A --> INT
+    INT --> Lpos["x,y,z"]
+    
+    %% Pack state
+    Lrot --> M["Quaternion Normalization"]
+    Lpos --> N["Pack State"]
     M --> N
-    L3 --> N
+    Lm --> N
     N --> O["state: batch×N×14"]
     
-    O --> P["Physics Residual Layer<br/>Autograd-based<br/>compute_dynamics"]
+    %% Physics residuals (full) and vertical-only loss
+    O --> P["PhysicsResidualLayer<br/>compute_dynamics"]
     A --> P
-    Q["control: batch×N×4"] --> P
-    P --> R["PhysicsResiduals<br/>ODE residuals"]
+    Q["control: batch×N×4 (zeros)"] --> P
+    P --> R["PhysicsResiduals<br/>diagnostics"]
     
-    O --> S["Output"]
+    %% Training loss (conceptual)
+    O --> LVERT["PINNLoss / PINNLossV2<br/>Vertical-only residual<br/>T_eff from ṁ"]
+    C --> LVERT
+    
+    O --> S["Output state"]
     R --> S
     
     style A fill:#e1f5ff,color:#000000
@@ -552,7 +565,9 @@ graph TD
     style K1 fill:#f8bbd0,color:#000000
     style K2 fill:#f8bbd0,color:#000000
     style K3 fill:#f8bbd0,color:#000000
+    style INT fill:#e3f2fd,color:#000000
     style P fill:#d1c4e9,color:#000000
+    style LVERT fill:#ffe0b2,color:#000000
     style O fill:#c8e6c9,color:#000000
     style S fill:#c8e6c9,color:#000000
 ```

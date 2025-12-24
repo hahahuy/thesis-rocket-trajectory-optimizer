@@ -261,10 +261,16 @@ def compute_dynamics(
     if scales is not None:
         g_dim = torch.tensor([0.0, 0.0, -g0], device=x.device, dtype=x.dtype)
         g_scale = scales['V']**2 / scales['L']
-        g_i = g_dim / g_scale  # Nondimensionalize acceleration
-        # Broadcast to match r_i shape
+        g_i_scalar = g_dim / g_scale  # [3] - nondimensionalize acceleration
+        # Broadcast to match r_i shape: [batch*N, 3]
         if is_batched:
-            g_i = g_i.unsqueeze(0).expand(r_i.shape[0], -1)  # [batch, 3]
+            batch_size_flat = r_i.shape[0]
+            if batch_size_flat > 0:
+                g_i = g_i_scalar.unsqueeze(0).repeat(batch_size_flat, 1)  # [batch*N, 3]
+            else:
+                g_i = g_i_scalar.unsqueeze(0)  # [1, 3] fallback
+        else:
+            g_i = g_i_scalar  # [3]
     else:
         g_i = torch.zeros_like(r_i)
         g_i[..., 2] = -g0 / (313.0**2 / 10000.0)  # Approximate scaling
@@ -274,6 +280,19 @@ def compute_dynamics(
     
     # Velocity derivative
     m_safe = torch.clamp(m, min=1e-3)
+    # Ensure shapes are compatible for broadcasting
+    # F_i: [batch*N, 3], m_safe: [batch*N, 1], g_i: [batch*N, 3] or broadcastable
+    # Ensure m_safe has shape [batch*N, 1]
+    if m_safe.dim() == 1:
+        m_safe = m_safe.unsqueeze(-1)
+    # Ensure g_i matches F_i shape for broadcasting
+    if g_i.dim() == 1 and g_i.shape[0] == 3:
+        g_i = g_i.unsqueeze(0).expand(F_i.shape[0], -1)
+    elif g_i.dim() == 2:
+        if g_i.shape[0] == 1 and g_i.shape[1] == 3:
+            g_i = g_i.expand(F_i.shape[0], -1)
+        elif g_i.shape[0] != F_i.shape[0] and g_i.shape[1] == 3:
+            g_i = g_i[0:1].expand(F_i.shape[0], -1)
     v_dot = F_i / m_safe + g_i
     
     # Quaternion derivative: q_dot = 0.5 * q * [0, w]

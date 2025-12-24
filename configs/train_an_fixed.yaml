@@ -1,0 +1,88 @@
+# Configuration for Direction AN with architectural physics fixes
+# 
+# Key changes from previous versions:
+# 1. Translation branch outputs [vx, vy, z, vz] only; x,y reconstructed via integration
+# 2. Mass branch uses MonotonicMassBranch (structurally non-increasing)
+# 3. Physics residual: vertical-only, thrust inferred from mass depletion
+# 4. Removed obsolete losses: mass_residual, vxy_residual, zero_vxy, zero_axy, hacc, xy_zero
+
+model:
+  type: direction_an
+  fourier_features: 8
+  stem_hidden_dim: 128
+  stem_layers: 4
+  activation: tanh
+  layer_norm: true
+  translation_branch_dims: [128, 128]
+  rotation_branch_dims: [256, 256]
+  mass_branch_dims: [64]
+  dropout: 0.0
+
+train:
+  experiment_name: direction_an_fixed
+  batch_size: 8
+  num_workers: 0
+  epochs: 200
+  learning_rate: 1e-3
+  weight_decay: 1e-5
+  time_subsample: null
+  early_stopping_patience: 30
+  early_stopping_patience_phase2: 50
+  early_stopping_min_delta: 0.0
+  use_v2_dataloader: false  # Use v1 dataloader (no T_mag/q_dyn needed)
+  scheduler:
+    type: cosine
+    kwargs:
+      T_max: 200
+      eta_min: 1e-6
+
+loss:
+  type: PINNLoss  # Use standard PINNLoss (not V2)
+  
+  # Core losses
+  lambda_data: 1.0
+  lambda_phys: 0.1  # Vertical-only physics residual (thrust from mass depletion)
+  lambda_phys_final: 1.0  # For homotopy schedule (if enabled)
+  lambda_bc: 1.0
+  
+  # Component group weights
+  lambda_translation: 1.0
+  lambda_rotation: 1.0
+  lambda_mass: 1.0
+  
+  # Removed losses (set to 0.0, will be ignored):
+  # - lambda_mass_residual: REMOVED (mass is structurally monotonic)
+  # - lambda_vxy_residual: REMOVED (horizontal dynamics not enforced)
+  # - lambda_zero_vxy: REMOVED (horizontal suppression not needed)
+  # - lambda_zero_axy: REMOVED (horizontal suppression not needed)
+  # - lambda_hacc: REMOVED (horizontal suppression not needed)
+  # - lambda_xy_zero: REMOVED (x,y reconstructed deterministically)
+  
+  # Optional temporal smoothing (light regularization)
+  lambda_smooth_z: 1.0e-4      # Vertical position smoothing
+  lambda_smooth_vz: 5.0e-5      # Vertical velocity smoothing
+  lambda_pos_vel: 0.5           # Position-velocity consistency
+  lambda_smooth_pos: 0.0        # Position curvature (disabled)
+  
+  # Quaternion normalization (optional)
+  lambda_quat_norm: 0.0
+  
+  # Mass flow consistency (should be ~0 with MonotonicMassBranch)
+  lambda_mass_flow: 0.0
+  
+  # Component weights for data loss (prioritize important states)
+  component_weights:
+    z: 2.0      # Vertical position (important)
+    vz: 2.0     # Vertical velocity (important)
+    m: 4.0      # Mass (important, structurally constrained)
+  
+  # Homotopy schedule (optional)
+  homotopy_schedule: fixed  # or "linear" to ramp physics weight
+  
+  # Phase schedule (disabled - no soft losses to ramp)
+  phase_schedule:
+    enabled: false
+
+physics_config: configs/phys.yaml
+scales_config: configs/scales.yaml
+

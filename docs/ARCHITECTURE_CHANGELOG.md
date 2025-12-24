@@ -1071,18 +1071,24 @@ loss:
    - **Key Feature**: Residual connections for gradient flow stability
 
 2. **Mission Branches** (Independent):
-   - **TranslationBranch**: `[128→128→128→6]` for `[x, y, z, vx, vy, vz]`
+   - **TranslationBranchReducedXYFree**: `[128→128→128→4]` for `[vx, vy, z, vz]`
    - **RotationBranch**: `[128→256→256→7]` for `[q0, q1, q2, q3, wx, wy, wz]`
-   - **MassBranch**: `[128→64→1]` for `[m]`
-   - **Key Difference**: All branches receive same latent (no dependency chain)
+   - **MonotonicMassBranch**: `[128→64→1]` for `[m(t)]` with structural monotonicity
+   - **Key Difference**: All branches receive same latent (no dependency chain); `x,y` are **not** predicted and are reconstructed by integrating `vx, vy`.
 
-3. **Physics Residual Layer**:
-   - Uses `compute_dynamics` from physics library (WP1)
-   - Computes ODE residuals using autograd
-   - Returns `PhysicsResiduals` dataclass
-   - **Purpose**: Provides physics residuals directly from forward pass
+3. **Deterministic x,y Reconstruction**:
+   - Assumes uniform time grid with step `Δt` taken from the first interval.
+   - Enforces `x(0)=y(0)=0` and reconstructs `x,y` via left-point integration of velocities:
+     - `x_k = Σ_{i<k} v_{x,i} · Δt`, `y_k = Σ_{i<k} v_{y,i} · Δt`.
+   - Removes `x,y` from the neural output space and anchors horizontal motion purely through velocity.
 
-4. **Dual Output**:
+4. **Physics Residual and Loss**:
+   - Forward pass still exposes full `PhysicsResidualLayer` for diagnostics.
+   - Training physics loss (`PINNLoss` / `PINNLossV2`) uses a **vertical-only residual** inferred from mass depletion:
+     - `ṁ = d m / dt`, `T_eff = -ṁ · Isp · g0`, `a_z = T_eff / m - g0`, `r_z = dv_z/dt - a_z`.
+   - Horizontal accelerations and lateral force balance are **not** enforced (controls/gimbal unknown; aero simplified).
+
+5. **Dual Output**:
    - Returns `(state_pred, physics_residuals)`
    - Enables flexible loss computation
    - Physics residuals available for analysis
@@ -1111,11 +1117,29 @@ model:
 ```
 
 ### Rationale
-- **Alternative to Dependency Chain**: Independent branches avoid complexity of ordered heads
-- **Residual Connections**: Better gradient flow than plain MLP
-- **Explicit Physics**: Physics residuals computed directly, not just in loss
-- **Unified Stem**: Simpler than C2's Transformer-based Shared Stem
-- **Physics Consistency**: Uses WP1 physics library for residual computation
+- **Alternative to Dependency Chain**: Independent branches avoid complexity of ordered heads.
+- **Residual Connections**: Better gradient flow than plain MLP.
+- **Architectural Physics**: Enforces `ẋ = v_x`, `ẏ = v_y` via integration instead of penalties; mass monotonicity is guaranteed by the branch, not by a soft constraint.
+- **Aligned Physics Loss**: Vertical-only residual derived from `ṁ` matches the available information (no explicit lateral controls), avoiding residual–data conflict.
+- **Unified Stem**: Simpler than C2's Transformer-based Shared Stem while still leveraging physics structure.
+
+### [2025-12-24] Direction AN – Physics-Guided Surrogate Fixes
+
+**Files**:
+- `src/models/direction_an_pinn.py` – reduced translation head, x/y integration, monotonic mass branch.
+- `src/train/losses.py`, `src/train/losses_v2.py` – vertical-only physics residual from `ṁ`, removal of horizontal / legacy soft-physics terms.
+- `configs/train_an_fixed.yaml` – training recipe using the updated architecture and loss.
+
+**Key Changes**:
+- **Translation head** now predicts `[vx, vy, z, vz]` only; `x(t), y(t)` are reconstructed deterministically by integrating `vx, vy` from `t=0` with `x(0)=y(0)=0`.
+- **Mass head** uses `MonotonicMassBranch` with structural guarantee `m(t+1) ≤ m(t)` and clamping to an effective dry mass, eliminating the need for a separate mass-residual loss.
+- **Physics loss** is redefined as a **vertical-only residual** inferred from mass depletion via the rocket equation `T_eff = -ṁ · Isp · g0`, enforcing `dv_z/dt ≈ T_eff/m - g0` without touching horizontal dynamics.
+- **Loss cleanup** removes obsolete or conflicting terms (`L_mass_residual`, `L_vxy_residual`, `L_zero_vxy`, `L_zero_axy`, `L_hacc`, `L_xy_zero`) while keeping data, boundary, quaternion norm, and light temporal smoothing.
+
+**Design Intent**:
+- Enforces non-negotiable physics (kinematics of `x,y`; monotonic mass; thrust–mass coupling) **architecturally** instead of via fragile penalties.
+- Aligns the physics loss with the actual training regime (unknown lateral controls, simplified aero), preventing residual–data conflict.
+- Produces a stable, physics-guided trajectory surrogate suitable for fast and robust state reconstruction.
 
 ### Implementation Status
 - ✅ Code integrated and tested

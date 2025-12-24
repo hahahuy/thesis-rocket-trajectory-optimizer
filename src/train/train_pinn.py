@@ -164,17 +164,10 @@ class SoftLossScheduler:
         self.ramp_type = schedule_cfg.get("ramp", "linear").lower()
 
         self.keys = [
-            "lambda_mass_residual",
-            "lambda_vz_residual",
-            "lambda_vxy_residual",
             "lambda_smooth_z",
             "lambda_smooth_vz",
             "lambda_pos_vel",
             "lambda_smooth_pos",
-            "lambda_zero_vxy",
-            "lambda_zero_axy",
-            "lambda_hacc",
-            "lambda_xy_zero",
         ]
         self.targets = {
             key: float(getattr(self.loss_fn, key, 0.0)) for key in self.keys
