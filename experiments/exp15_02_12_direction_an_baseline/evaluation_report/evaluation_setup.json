@@ -1,0 +1,6 @@
+{
+  "test_set_size": 20,
+  "time_horizon": "0-30 s",
+  "sampling_rate": 1501,
+  "metrics": "RMSE, mean \u00b1 SD"
+}
