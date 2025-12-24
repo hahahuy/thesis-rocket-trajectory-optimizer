@@ -506,9 +506,60 @@ graph TD
     style AE fill:#c8e6c9,color:#000000
 ```
 
-## Direction AN: Shared Stem + Mission Branches + Physics-Guided Surrogate
+## Direction AN (Baseline): Shared Stem + Mission Branches + Physics Residuals
 
-Shared stem with residual MLP, reduced translation head with x/y integration, monotonic mass branch, and physics residuals used in a vertical-only loss.
+Shared stem with residual MLP, independent mission branches predicting full translation state, and physics residual layer that computes full ODE residuals.
+
+```mermaid
+graph TD
+    A["t: batch×N×1"] --> B["TimeEmbedding<br/>FourierFeatures<br/>8 frequencies"]
+    C["context: batch×7"] --> D["ContextEncoder<br/>7→128, Tanh"]
+    B --> E["t_emb: batch×N×17"]
+    D --> F["ctx_emb: batch×128"]
+    E --> G["Broadcast ctx_emb<br/>to batch×N×128"]
+    F --> G
+    G --> H["Concatenate<br/>t_emb || ctx_emb"]
+    H --> I["ANSharedStem<br/>Residual MLP<br/>4 layers × 128<br/>Tanh, LayerNorm"]
+    I --> J["latent: batch×N×128"]
+    
+    J --> K1["TranslationBranch<br/>128→128→128→6"]
+    J --> K2["RotationBranch<br/>128→256→256→7"]
+    J --> K3["MassBranch<br/>128→64→1"]
+    
+    K1 --> L1["translation: 6D<br/>[x,y,z,vx,vy,vz]"]
+    K2 --> L2["rotation: 7D<br/>[q0,q1,q2,q3,wx,wy,wz]"]
+    K3 --> L3["mass: 1D<br/>[m]"]
+    
+    L2 --> M["Quaternion Normalization"]
+    L1 --> N["Pack State"]
+    M --> N
+    L3 --> N
+    N --> O["state: batch×N×14"]
+    
+    O --> P["Physics Residual Layer<br/>Full ODE residual<br/>compute_dynamics"]
+    A --> P
+    Q["control: batch×N×4 (zeros)"] --> P
+    P --> R["PhysicsResiduals<br/>diagnostics + loss"]
+    
+    O --> S["Output state"]
+    R --> S
+    
+    style A fill:#e1f5ff,color:#000000
+    style C fill:#e1f5ff,color:#000000
+    style Q fill:#e1f5ff,color:#000000
+    style I fill:#fff9c4,color:#000000
+    style J fill:#fff9c4,color:#000000
+    style K1 fill:#f8bbd0,color:#000000
+    style K2 fill:#f8bbd0,color:#000000
+    style K3 fill:#f8bbd0,color:#000000
+    style P fill:#d1c4e9,color:#000000
+    style O fill:#c8e6c9,color:#000000
+    style S fill:#c8e6c9,color:#000000
+```
+
+## Direction AN1: Shared Stem + Physics-Guided Surrogate
+
+Refinement of AN with reduced translation head, x/y integration, monotonic mass branch, and physics residuals used in a vertical-only loss.
 
 ```mermaid
 graph TD
@@ -588,7 +639,8 @@ graph TD
 | **Direction D1.5** | D + soft physics + mass monotonicity + 6D rotation | ~0.20 |
 | **Direction D1.5.3** | D1.5 + v2 dataloader (T_mag, q_dyn) + v2 loss | **0.198** |
 | **Direction D1.5.4** | D1.5 + central diff (PINNLossV2) | **0.254** |
-| **Direction AN** | Shared stem + mission branches + physics residuals | **0.197** |
+| **Direction AN** | Shared stem + mission branches + full ODE residual | **0.197** |
+| **Direction AN1** | AN + x/y integration, monotonic mass, vertical-only residual | **0.197** |
 
 ## Component Relationships
 
@@ -606,7 +658,8 @@ graph LR
     H --> J["Direction D1.5<br/>Soft Physics"]
     J --> K["Direction D1.5.3<br/>V2 Dataloader"]
     K --> K2["Direction D1.5.4<br/>Central Diff"]
-    A --> L["Direction AN<br/>Shared Stem + Branches"]
+    A --> L["Direction AN<br/>Shared Stem + Branches (Baseline)"]
+    L --> M["Direction AN1<br/>Physics-Guided AN"]
     
     style A fill:#e1f5ff,color:#000000
     style B fill:#fff9c4,color:#000000
@@ -621,6 +674,7 @@ graph LR
     style K fill:#64b5f6,color:#000000
     style K2 fill:#4fc3f7,color:#000000
     style L fill:#ce93d8,color:#000000
+    style M fill:#ba68c8,color:#000000
 ```
 
 ## Data Flow Summary
