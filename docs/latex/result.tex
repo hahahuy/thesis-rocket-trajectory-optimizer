@@ -2,17 +2,17 @@
 
 \section{Evaluation Setup}
 
-This chapter evaluates the performance of the proposed Physics-Informed Neural 
-Network using a held-out test set that was not used during training. The 
-objective is to assess trajectory reconstruction accuracy, quantitative error 
-characteristics, and compliance with physical constraints.
+This chapter evaluates the performance of the proposed PINN-inspired physics-regularized 
+neural surrogate uing a held-out test set that was not used during training. To evaluate 
+how well trajectories are reconstructed, examine numerical error patterns alongside adherence 
+to selected physical constraints.
 
-The test dataset consists of multiple simulated rocket trajectories generated 
-using a high-fidelity ordinary differential equation solver. Each trajectory 
-spans a fixed time horizon of 30 seconds and includes translational states, 
-rotational states represented by quaternions, and vehicle mass evolution. 
-All trajectories are sampled at a uniform temporal resolution consistent with 
-the training setup.
+The evaluation set includes several numerically generated ascent trajectories for rockets employing 
+the same high-fidelity numerical integration framework described in Chapter II. Every 
+path over a set period of thirty seconds, including movement-related conditions, is part 
+of the evaluation set. States of rotation are described through quaternions, while 
+changes in vehicle mass unfold over time. All trajectories are sampled at a 
+uniform temporal resolution of 50 Hz, consistent with the training setup.
 
 Prediction accuracy is evaluated by comparing the PINN outputs against the reference 
 solver outputs at corresponding time instances. Absolute error is computed 
@@ -22,8 +22,9 @@ RMSE values are computed per trajectory and then aggregated across the test
 dataset.
 
 No control inputs or reference trajectories are provided to the network during 
-inference. The model predicts the full state evolution solely from the initial 
-condition and time input.
+inference. The model predicts the full state evolution solely from time and mission 
+context parameters, without access to control inputs or reference trajectories during 
+inference.
 
 \section{Trajectory Reconstruction Results}
 
@@ -34,10 +35,12 @@ time evolution of different state components.
 
 \subsection{Vertical Motion}
 
+The vertical motion results demonstrate the model's ability to reconstruct position and velocity trajectories. As shown in Figure~\ref{fig:vertical_motion}, the predicted vertical position closely follows the reference solution over the full ascent phase, with a visible but small deviation near the end of the time horizon. Figure~\ref{fig:vertical_velocity} presents the corresponding vertical velocity profile, where the predicted velocity captures the overall trend and curvature of the reference trajectory, with noticeable divergence during the later phase of motion.
+
 \begin{figure}[htbp]
     \centering
     \includegraphics[width=14.5cm]{figures/evaluation_report/figures/figure_3_1_vertical_position.png}
-    \caption{shows the vertical position as a function of time. The PINN 
+    \caption{Vertical position: Shows the vertical position as a function of time. The PINN 
     prediction closely follows the reference solution over the full ascent phase, 
     with a visible but small deviation near the end of the time horizon.}
     \label{fig:vertical_motion}
@@ -46,7 +49,7 @@ time evolution of different state components.
 \begin{figure}[htbp]
     \centering
     \includegraphics[width=14.5cm]{figures/evaluation_report/figures/figure_3_2_vertical_velocity.png}
-    \caption{presents the corresponding vertical velocity profile. The predicted 
+    \caption{Vertical velocity: Presents the corresponding vertical velocity profile. The predicted 
     velocity captures the overall trend and curvature of the reference trajectory, 
     with noticeable divergence during the later phase of motion.}
     \label{fig:vertical_velocity}
@@ -55,35 +58,46 @@ time evolution of different state components.
 
 \subsection{Mass evolution}
 
+The mass evolution results highlight the model's ability to approximate the overall trend of propellant 
+consumption during the burn phase and the constant-mass regime after cutoff, as 
+shown in Figure~\ref{fig:mass_evolution}. Small oscillations around the terminal mass, visible in 
+the figure, indicate limitations of soft constraint enforcement rather than numerical instability.
+
 \begin{figure}[htbp]
     \centering
     \includegraphics[width=14.5cm]{figures/evaluation_report/figures/figure_3_3_mass_evolution.png}
-    \caption{compares the predicted mass evolution against the reference solution. During the 
-    propulsive phase, the predicted mass follows the general decreasing trend of the reference. 
-    After propellant depletion, the reference mass remains constant, while the predicted mass 
-    exhibits small fluctuations around the terminal value.}
+    \caption{Mass evolution: Compares the predicted mass evolution against the reference solution. During the 
+    propulsive phase, although the forecasted values drop steadily like the standard curve, 
+    minor variations appear once fuel runs out. While the actual mass stabilizes completely, the 
+    model's output shows slight deviations near the endpoint. These differences persist without 
+    growing larger over time.}
     \label{fig:mass_evolution}
 \end{figure}
 
 \subsection{Horizontal motion}
 
+The horizontal motion results illustrate small deviations from the zero-motion reference trajectory, as shown in Figure~\ref{fig:horizontal_position}. These deviations reflect imperfect symmetry preservation and provide insight into the limitations of penalty-based constraints in unconstrained dimensions.
+
 \begin{figure}[htbp]
     \centering
     \includegraphics[width=14.5cm]{figures/evaluation_report/figures/figure_3_4_horizontal_position.png}
-    \caption{illustrates the horizontal position components. The reference trajectory remains at zero 
-    in both horizontal directions, while the predicted trajectory exhibits small deviations, indicating 
-    drift in lateral motion.}
+    \caption{Horizontal position: Shows how position changes sideways. In both left-right directions, the target path stays 
+    flat at zero. Instead, the forecasted route shifts slightly, showing movement off course. This 
+    shift appears because weak constraints affect symmetric systems more strongly. Sensitivity grows 
+    when balance rules lack tight control.}
     \label{fig:horizontal_position}
 \end{figure}
 
 \subsection{Attitude representation}
 
+The attitude results demonstrate stable quaternion behavior throughout the trajectory, as shown in Figure~\ref{fig:attitude_representation}. Explicit normalization effectively prevents drift in the orientation representation, ensuring physically meaningful rotational states, which is confirmed by the extremely small deviation from unity observed in the figure.
+
 \begin{figure}[htbp]
     \centering
     \includegraphics[width=14.5cm]{figures/evaluation_report/figures/figure_3_5_quaternion_norm.png}
-    \caption{reports the deviation of the predicted quaternion norm from unity over time. 
-    The deviation remains extremely small throughout the trajectory, indicating that quaternion 
-    normalization is largely preserved.}
+    \caption{Quaternion norm: Show how closely the predicted quaternion norm stays to one over time. Despite minor 
+    fluctuations, the value hardly drifts away from one, which suggests normalization holds well 
+    across the entire trajectory.}
     \label{fig:attitude_representation}
 \end{figure}
 
@@ -97,9 +111,9 @@ using quantitative error measures.
 \begin{table}[htbp]
     \centering
     \input{figures/evaluation_report/tables/table_3_1_rmse_per_state.tex}
-    \caption{summarizes the root-mean-square error for each state variable, 
-    averaged across all test trajectories. Position, velocity, rotation, and mass 
-    errors are reported separately to reflect their different physical scales.}
+    \caption{The root-mean-square error for each state variable, averaged across 20 
+    test trajectories. Where position, velocity, rotation, and mass errors are reported separately 
+    to reflect their different physical scales.}
     \label{tab:per_state_rmse}
 \end{table}
 
@@ -108,8 +122,8 @@ using quantitative error measures.
 \begin{table}[htbp]
     \centering
     \input{figures/evaluation_report/tables/table_3_2_summary.tex}
-    \caption{provides a condensed summary of overall error statistics, including mean and 
-    dispersion measures across the test set. These metrics offer a compact overview of 
+    \caption{Summary of overall error statistics, including mean and 
+    dispersion measures across 20 test trajectories, created an overview of 
     prediction accuracy beyond individual state variables.}
     \label{tab:Aggregate_performance_measures}
 \end{table}
@@ -119,27 +133,33 @@ using quantitative error measures.
 \begin{figure}[htbp]
     \centering
     \includegraphics[width=14.5cm]{figures/evaluation_report/figures/figure_3_9_rmse_distribution.png}
-    \caption{visualizes the distribution of RMSE values across all test trajectories for different 
-    state groups. The logarithmic scale highlights variability and outliers in prediction performance.}
+    \caption{The distribution of RMSE values across 20 test trajectories for different state groups, 
+    created a logarithmic scale to highlight variability and outliers in prediction performance.}
     \label{fig:RMSE_distribution}
 \end{figure}
 
 \section{Constraint Satisfaction Results}
 
-This section examines whether the PINN predictions satisfy key physical constraints imposed during training.
+This section examines whether the model's predictions satisfy key physical constraints imposed during 
+training. By plotting the time evolution of the physics residual norm, we can see how well the model's 
+predictions satisfy the governing equations of motion.
 
 \subsection{Physics residual norm}
+
+Figure~\ref{fig:Physics_residual_norm} shows the time evolution of the physics residual norm for the representative trajectory. The residual magnitude varies over time and exhibits a notable decrease toward the end of the trajectory, as shown in the figure. The reduction in residual magnitude should not be interpreted as uniform improvement in physical accuracy, but as a consequence of reduced actuation and simplified dynamics after thrust termination.
 
 \begin{figure}[htbp]
     \centering
     \includegraphics[width=14.5cm]{figures/evaluation_report/figures/figure_3_10_physics_residuals.png}
-    \caption{shows the time evolution of the physics residual norm for the representative trajectory. 
+    \caption{Time evolution of the physics residual norm for the representative trajectory. 
     The residual magnitude varies over time and exhibits a notable decrease toward the end of the 
-    trajectory.}
+    trajectory. The reduction in residual magnitude should not be interpreted as uniform improvement in physical accuracy, but as a consequence of reduced actuation and simplified dynamics after thrust termination.}
     \label{fig:Physics_residual_norm}
 \end{figure}
 
 \subsection{Mass monotonicity constraint}
+
+Figure~\ref{fig:mass_monotonicity} evaluates compliance with the mass monotonicity constraint by plotting the time derivative of mass. The reference trajectory shows no violations, while the predicted trajectory exhibits multiple instances where the monotonicity condition is violated, as shown in the figure.
 
 \begin{figure}[htbp]
     \centering
@@ -153,16 +173,17 @@ This section examines whether the PINN predictions satisfy key physical constrai
 
 \section{Summary of Observed Results}
 
-The results presented in this chapter demonstrate that the proposed PINN is capable of 
-reconstructing the overall structure of rocket trajectories for a representative test 
-case, as shown by close visual agreement in vertical position and velocity. Quantitative 
-evaluation across the test set indicates that prediction errors vary by state type, with 
-mass and rotational states exhibiting distinct error distributions.
-
-Constraint satisfaction analysis reveals that quaternion normalization is largely 
-maintained, while mass monotonicity violations occur in the predicted trajectories. 
-Physics residual magnitudes remain bounded and decrease toward the end of the simulated 
-time horizon.
+In this chapter, we demonstrate that the proposed neural surrogate is capable of 
+reconstructing the overall structure of rocket trajectories, as shown by close visual agreement 
+in vertical position and velocity in Figures~\ref{fig:vertical_motion} and~\ref{fig:vertical_velocity}. 
+Quantitative evaluation across the test set, as summarized in Table~\ref{tab:per_state_rmse} and 
+Figure~\ref{fig:RMSE_distribution}, indicates that prediction errors vary by state type, with 
+mass and rotational states exhibiting distinct error distributions. Quaternion normalization was maintained 
+throughout the trajectory via constant satisfaction of the quaternion norm as shown in 
+Figure~\ref{fig:attitude_representation}, while mass monotonicity violations occur in the predicted 
+trajectories, as illustrated in Figure~\ref{fig:mass_monotonicity}. The physics residuals 
+remain bounded and decrease toward the end of the simulated time horizon, as shown in 
+Figure~\ref{fig:Physics_residual_norm}.
 
 All observations reported in this chapter are based solely on empirical evaluation results 
 without interpretation of underlying causes.

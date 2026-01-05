@@ -10,8 +10,8 @@ The methodology was organized around three sequential stages. First, a physical
 model of six-degree-of-freedom (6-DOF) rocket dynamics was formulated and
 implemented numerically. Second, optimal control trajectories were generated
 using direct collocation methods and used to construct training datasets. Third,
-physics-informed neural network (PINN) surrogates were trained on these datasets
-to approximate the dynamics. The relationship between the optimal control solver,
+PINN-inspired surrogates were trained on these datasets
+to approximate optimal ascent trajectories implied by the dynamics. The relationship between the optimal control solver,
 truth integrator, and PINN surrogate is illustrated schematically in
 Figure~\ref{fig:Relationship_OTP_PINN}.
 
@@ -262,7 +262,8 @@ For data-driven approximation, a differentiable version of the dynamics and the
 physics-informed neural network models were implemented using PyTorch~\cite{paszke2019} 
 version 2.x (or LibTorch 2.3.1 as an C++ frontend for PyTorch). 
 This module mirrored the CasADi model, including the state and control definitions, 
-aerodynamic coefficients, and mass dynamics, but used tensor operations to enable automatic differentiation.
+aerodynamic coefficients, and mass dynamics, but used tensor operations to enable formal 
+automatic differentiation of the surrogate.
 
 The time discretization was fixed at \(N = 1501\) points, corresponding to a
 30-second flight duration sampled at 50 Hz.
@@ -286,7 +287,9 @@ sampled at 50 Hz. Each processed dataset exposed a time grid, a context vector
 parameters (initial mass \(m_0\), specific impulse \(I_\mathrm{sp}\), drag
 coefficient \(C_\mathrm{D}\), lift-curve slope \(C_{\mathrm{L}\alpha}\),
 pitch-moment coefficient \(C_{\mathrm{m}\alpha}\), maximum thrust
-\(T_\mathrm{max}\), and wind magnitude), and normalised state targets.
+\(T_\mathrm{max}\), and normalised state targets. Although the context vector 
+includes a wind magnitude parameter for extensibility, wind disturbances were 
+set to zero in all experiments reported in this thesis.
 
 The state tensor shape was \(\text{state} \in \mathbb{R}^{N_\mathrm{cases}
 \times N_\mathrm{time} \times 14}\), where \(N_\mathrm{cases}\) is the number
@@ -330,6 +333,11 @@ dimensional quantities. This nondimensionalization follows standard practice
 in numerical simulation for conditioning and training stability~\cite{anderson1995}.
 
 \section{Physics-Informed Neural Network Model}
+
+Unlike classical PINNs that enforce differential equations via automatic differentiation 
+at collocation points, the present approach employs finite-difference approximations of 
+temporal derivatives on discretized trajectories, and is therefore described as PINN-inspired 
+rather than a strict PINN formulation.
 
 \subsection{Model Inputs and Outputs}
 
@@ -396,9 +404,16 @@ In the PINN setting, explicit control inputs were omitted and set to zero in the
 physics residual, reflecting the design choice that the network learned state
 evolution implicitly from trajectories rather than from control commands. The
 control \(\mathbf{u}_k\) in the physics loss was therefore set to zero
-(\(\mathbf{u}_k = [0, 0, 0, 0]^\top\)). This zero-control assumption was
-consistent with the processed dataset format, which did not include control
-trajectories.
+(\(\mathbf{u}_k = [0, 0, 0, 0]^\top\)).It is emphasized that this residual does 
+not correspond to the true flight dynamics; instead, it acts as a structural 
+regularizer that biases the learned trajectories toward smooth, physically plausible 
+manifolds consistent with the reduced, uncontrolled dynamics. It is important 
+to note that this zero-control assumption was consistent with the processed dataset 
+format, which did not include control trajectories.
+
+As a result, the physics residual does not represent the full controlled dynamics, but instead acts as a regularizer that biases the learned trajectories toward consistency with the uncontrolled structure of the governing equations. Because control inputs are omitted, the residual does not represent the true flight dynamics, but instead biases the learned trajectories toward a physically structured manifold.
+
+Accordingly, the residual should be interpreted as a physics-based regularizer rather than an enforcement of the full controlled equations of motion.
 
 \subsection{Architecture Selection Procedure}
 
@@ -437,16 +452,19 @@ in Figure~\ref{fig:ArchitectureSelection}.
 \subsection{Loss Function Definition}
 
 The total training loss was constructed as a weighted combination of multiple 
-terms enforcing data fidelity, physical consistency, and structural constraints. 
+terms enforcing data fidelity, physics-based regularization, and structural constraints. 
 Rather than relying on a single objective, the loss function was designed to reflect 
 different aspects of the rocket ascent dynamics following standard physics-informed 
 learning formulations~\cite{raissi2019}.
 
+In addition to the core data and physics losses, several auxiliary regularization terms 
+were introduced as inductive biases to stabilize training and encode known symmetries of 
+the ascent problem; these terms are not intended to represent independent physical laws. 
 The primary loss components were grouped into four categories:
 \begin{enumerate}
   \item Data fidelity losses, which penalized deviations between predicted and 
   reference state trajectories obtained from numerical simulation.
-  \item Physics consistency losses, which penalized violations of the governing equations 
+  \item Physics-based regularization losses, which penalized violations of a reduced form of the governing equations 
   of motion, including translational dynamics, rotational kinematics, and mass depletion.
   \item Structural constraint losses, which enforced properties intrinsic to the system 
   representation, such as unit-norm quaternion constraints and monotonic mass depletion.
@@ -532,6 +550,8 @@ where the loss weights were set to \(\lambda_\mathrm{data} = 1.0\),
 10^{-3}\), \(\lambda_\mathrm{zero,vxy} = 1.0\), \(\lambda_\mathrm{zero,axy} =
 1.0\), \(\lambda_\mathrm{hacc} = 0.02\), and \(\lambda_\mathrm{xy,zero} = 5.0\).
 
+These auxiliary loss terms should be interpreted as inductive biases encoding known symmetries and qualitative properties of the ascent problem, rather than as substitutes for the governing equations themselves. Several constraints intentionally overlap in their effect to stabilize learning in symmetry-dominated dimensions and do not represent independent physical laws.
+
 \subsection{Optimization and Training Schedule}
 
 The network was trained using the Adam optimizer~\cite{kingma2015} with learning rate \(1.0 \times
@@ -582,7 +602,8 @@ for each state dimension \(d\), while aggregated metrics were computed for
 translation (components 1--6: position and velocity), rotation (components
 7--13: quaternion and angular velocity), and mass (component 14). All RMSE values
 were reported in nondimensional units, reflecting the scaled state
-representation used during training.
+representation used during training, and RMSE does not capture localized constraint 
+violations, which are examined separately in Section 3.4
 
 \subsection{Loss Weight Selection and Sensitivity Analysis}
 
@@ -637,6 +658,6 @@ with 1501 points over 30 seconds. A physics-informed neural network architecture
 (Direction AN) was designed with a shared stem, three specialized branches for
 translation, rotation, and mass, and a physics residual layer. The network was
 trained using a phased schedule with Adam optimization, incorporating data
-fidelity, physics consistency, structural constraints, and smoothing
+fidelity, physics-based regularization, structural constraints, and smoothing
 regularization terms in the loss function.
 

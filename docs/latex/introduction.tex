@@ -8,116 +8,126 @@
 \justifying
 \section{Background and Motivation}
 
-Trajectory optimization for rocket ascent is a classical and central problem in
-aerospace engineering. The objective is to determine thrust and steering
-profiles that guide a launch vehicle from liftoff to a desired terminal state
-while satisfying nonlinear dynamics, path constraints, and structural or
-operational limits. Traditionally, this problem has been addressed using
-indirect methods derived from Pontryagin's Maximum Principle or direct
-transcription approaches such as collocation and pseudospectral methods, which
-convert the continuous-time optimal control problem into a large-scale
-nonlinear programming problem~\cite{bryson1975,ross2004,betts2010}.
+Trajectory optimization for rocket ascent is a foundational problem in aerospace engineering, involving 
+the determination of thrust and steering profiles that guide a launch vehicle from liftoff to a desired 
+terminal state while satisfying nonlinear dynamics, operational constraints, and structural limits. Classical 
+solution approaches are well established and include indirect methods derived from Pontryagin’s Maximum 
+Principle as well as direct transcription techniques such as collocation and pseudospectral methods, which 
+convert the continuous-time optimal control problem into a large-scale nonlinear programming 
+problem~\cite{bryson1975,ross2004,betts2010}.
 
-These classical methods are theoretically rigorous and widely used in practice,
-but they rely on repeated numerical integration of nonlinear ordinary
-differential equations and the solution of large constrained optimization
-problems. As a result, they can be computationally expensive, sensitive to
-initialization, and difficult to embed within higher-level design loops or
-real-time decision-making frameworks. This limitation has motivated growing
-interest in surrogate modelling techniques that can approximate system
-dynamics while remaining computationally efficient and differentiable.
+While these methods are theoretically rigorous and widely used, they rely on repeated numerical integration 
+of high-dimensional nonlinear ordinary differential equations and the solution of constrained optimization 
+problems with thousands of decision variables. As a result, they can become computationally expensive in 
+repeated-evaluation settings, sensitive to initialization, and less amenable to direct embedding in higher-level 
+loops when repeated evaluation or gradient access is required within higher-level design 
+loops, uncertainty analysis, or real-time decision-making frameworks. These limitations become particularly 
+pronounced when repeated trajectory evaluations or gradient information are required, such as in design 
+space exploration or optimization under uncertainty.
 
-In parallel, advances in scientific machine learning have introduced
-physics-informed neural networks (PINNs) as a framework for incorporating
-physical laws directly into neural network training. Originally proposed by
-Raissi et al.~\cite{raissi2019}, PINNs augment standard data-driven loss
-functions with penalties enforcing governing differential equations, enabling
-neural networks to learn solutions that are consistent with known physics.
-Subsequent work has extended this idea to a wide range of forward and inverse
-problems in physics and engineering, highlighting both the promise and the
-challenges of the approach~\cite{karniadakis2021,pinnbook2022}.
+To address these challenges, various surrogate modeling strategies have been investigated as practical alternatives 
+for approximating rocket dynamics while lowering computational demands. There are many different common methods used 
+to increase the speed of simulations, including; (1) Response Surface Methods, (2) Reduced Order Models, and (3) Fully 
+Data-driven Neural Networks. Many times these methods provide enormous improvements in simulation speed compared to 
+traditional approaches; however, these same methods have also been shown in a number of cases to lack robustness and 
+therefore do not provide sufficient assurance that what is predicted outside the training conditions will be physically 
+reasonable.
 
-Together, these developments suggest an opportunity to revisit rocket ascent
-modelling from a new perspective, in which neural networks are not used purely
-as black-box approximators, but as physics-guided surrogates that retain
-computational efficiency, differentiability, and physical structure while
-reducing reliance on repeated numerical integration.
-
+Meanwhile other techniques under development within the field of Scientific Machine Learning have led to the emergence of 
+"Physics-Informed Neural Networks", and more broadly a number of other types of Physics Regularized Learning Models, all of 
+which use physical knowledge during the training of a model. Instead of simply fitting a model to observed data, these methods 
+utilize additional constraints to allow the model to take on additional information from the governing physics equations 
+governing system behaviour. This formulation allows Neural Networks to maintain their flexibility while being guided by both 
+observed data and the underlying physical laws that govern all physical systems. The rapidly growing intersection between 
+Surrogate Modelling techniques and Physics-Informed learning techniques, therefore, provides an ideal impetus to re-evaluate 
+Rocket Ascent Modelling through the use of a Machine Learning lens.
 \subsection{State of the Art}
 
-Recent research in physics-informed machine learning has demonstrated the
-potential of PINNs to model complex dynamical systems governed by ordinary and
-partial differential equations. Comprehensive surveys have summarized the
-strengths and limitations of the PINN framework, including challenges related
-to optimization stiffness, loss balancing, and generalization
-behaviour~\cite{karniadakis2021,pinnbook2022}. Analytical studies have further
-examined PINN training dynamics and failure modes, emphasizing the importance
-of architectural design and loss construction for practical
-success~\cite{wang2022,mishra2022}.
+\noindent In this thesis, the term PINN-inspired is used to denote physics-regularized learning 
+architectures that incorporate physical structure through soft constraints, rather than 
+strict equation enforcement.
 
-In aerospace applications, surrogate modelling has traditionally relied on
-response surfaces, reduced-order models, or purely data-driven neural
-networks. While such models can be effective within narrow operating regimes,
-they often struggle to extrapolate beyond the training domain and provide
-limited physical interpretability. PINNs offer a middle ground by combining
-data fidelity with physics-based regularization, making them particularly
-attractive for modelling rocket ascent dynamics, where governing equations are
-well understood but computationally expensive to evaluate repeatedly.
+\noindent Physics-informed neural networks were originally proposed as a means of solving forward and 
+inverse problems governed by differential equations by embedding the governing equations 
+directly into the learning objective. Since their introduction, PINNs have been applied to a 
+wide range of problems in fluid dynamics, solid mechanics, and control, and extensive surveys 
+have documented both their potential and their limitations. In particular, prior work has 
+highlighted challenges related to optimization stiffness, loss balancing, long-horizon 
+accuracy, and constraint enforcement~\cite{raissi2019,wang2022}.
 
-Despite this promise, the application of PINNs to constrained optimal control
-problems remains relatively underexplored, especially for rocket ascent.
-Existing studies predominantly focus on forward or inverse dynamics problems,
-while fewer works investigate structured PINN surrogates as replacements for
-high-fidelity dynamics models within trajectory optimization pipelines. This
-gap is especially pronounced for six-degree-of-freedom (6-DOF) ascent
-problems, which involve strong nonlinearities, coupling between translational
-and rotational motion, and mass depletion effects.
+Analytical and empirical studies have further shown that PINN performance is highly sensitive 
+to architectural choices, training strategies, and the relative weighting of data and physics 
+losses. While PINNs can approximate smooth solution manifolds effectively, they do not 
+generally provide hard guarantees of constraint satisfaction when physical laws are 
+enforced through penalty-based formulations~\cite{wang2022}. These limitations are particularly pronounced 
+when the governing equations are nonlinear and coupled, as is the case for rocket ascent dynamics.
+
+In aerospace applications, learning-based surrogate models have traditionally been used for 
+aerodynamic prediction, reduced-order dynamics, or narrow operating regimes. The application 
+of physics-informed learning to trajectory optimization problems remains comparatively limited, 
+particularly for six-degree-of-freedom (6-DOF) rocket ascent dynamics, which involve strong 
+nonlinearities, coupling between translational and rotational motion, and mass depletion 
+effects.
+
+Existing studies in this area have primarily focused on forward or inverse dynamics problems, while 
+fewer works investigate structured neural surrogates trained on optimal trajectories as approximations 
+to high-fidelity numerical integration. This gap is especially relevant for ascent problems, where repeated 
+trajectory evaluation is computationally demanding and where physical structure is well understood but 
+difficult to enforce strictly within learning-based models~\cite{raissi2019,wang2022}.
 
 \subsection{Rationale}
 
-The central motivation of this thesis is to investigate whether a structured
-physics-informed neural network can serve as a differentiable surrogate for
-rocket ascent dynamics. Rather than repeatedly integrating nonlinear ordinary
-differential equations, the surrogate aims to approximate the full state
-evolution directly as a function of time and mission parameters, while
-remaining consistent with the underlying physical laws.
+The central rationale of this thesis is to investigate whether a structured, PINN-inspired, 
+physics-regularized neural network can serve as an effective surrogate for rocket ascent 
+trajectory reconstruction. Rather than learning a closed-form state-transition function or 
+directly optimizing control inputs, the proposed approach aims to approximate optimal ascent 
+trajectories as explicit functions of time and mission parameters.
 
-Such surrogates are particularly appealing for ascent analysis and preliminary
-design studies, where rapid evaluation of trajectory behaviour and sensitivity
-to physical parameters is required. By shifting the computational burden to an
-offline training phase, the learned model can potentially support future
-optimization and guidance frameworks that require fast, smooth, and physically
-consistent approximations of rocket dynamics.
+Surrogates that ascertain the approximate behavior of a trajectory can be generated quickly and 
+differentiably (allowing gradients to be computed) by utilizing the computational load during the 
+offline training stage rather than performing the numerical integration task at each iteration during 
+the inference stage. In addition, to provide further opportunities for physical interpretability, 
+physics-based regularization is performed by incorporating 'soft' residual penalties (in fact, the 
+residuals are derived from a reduced form of the governing equations) to ensure that the approximate behavior 
+produced by the surrogate is both physical plausible and retains the flexibility to be modified through 
+the data-driven learning process.
+
+This formulation is particularly suited to ascent analysis and preliminary design studies, 
+where fast evaluation and smooth sensitivity information are valuable, but strict enforcement 
+of all physical constraints may be relaxed. The surrogate is not intended to replace the 
+optimal control solver, but to approximate its output trajectories under similar conditions. 
+The study therefore focuses on assessing the accuracy, stability, and physical plausibility of 
+trajectory reconstruction under soft constraints, rather than on direct deployment in 
+closed-loop control or safety-critical applications.
 
 \subsection{Problem Statement}
 
-The problem addressed in this thesis is the development of a
-physics-informed neural network surrogate capable of approximating the
-three-dimensional ascent dynamics of a rocket during the launch phase. The
-surrogate is trained on full-state trajectories generated from high-fidelity
-numerical simulations of a 6-DOF rigid-body dynamics model and is designed to
-reproduce the coupled translational, rotational, and mass-depletion behaviour
-of rocket ascent.
+The problem addressed in this thesis is the development of a PINN-inspired, physics-regularized 
+trajectory surrogate capable of approximating three-dimensional rocket ascent behavior during 
+the launch phase. The surrogate is trained on full-state trajectories generated from high-fidelity 
+numerical simulations of a 6-DOF rigid-body dynamics model and is designed to reproduce the dominant 
+coupled translational, rotational, and mass-depletion characteristics of ascent under soft physics-based 
+regularization.
 
-While the broader objective is to support constrained trajectory optimization,
-the focus of this study is on the accurate and physically consistent
-approximation of ascent dynamics, rather than on the direct computation of
-optimal control inputs using the surrogate.
+While the broader motivation is to support future trajectory optimization workflows, the scope of 
+this study is limited to trajectory reconstruction and physical consistency analysis, rather than the 
+direct computation of optimal control inputs using the learned surrogate.
 
 \subsection{Objectives}
 
 The specific objectives of this thesis are as follows:
 \begin{enumerate}
   \item To formulate a three-dimensional rocket ascent model suitable for
-        physics-informed learning.
-  \item To design a structured PINN architecture incorporating Fourier time
+        physics-regularized learning.
+  \item To design a structured PINN-inspired architecture incorporating Fourier time
         embeddings, context encoding, and residual multilayer perceptrons.
-  \item To train the surrogate using full-state trajectory data generated from
-        high-fidelity numerical simulations.
-  \item To evaluate the accuracy, stability, and physical consistency of the
-        learned surrogate during the launch phase.
-  \item To assess the suitability of the surrogate as a building block for
-        future integration into constrained trajectory optimization frameworks.
+  \item To train the surrogate using full-state trajectory data generated from 
+        high-fidelity numerical simulations relative to the surrogate model.
+  \item To evaluate the accuracy, stability, and approximate physical consistency of the
+        learned surrogate during the launch phase under soft physics-based constraints.
+  \item To assess, at a conceptual level, the suitability of the surrogate as a building block
+        for potential future integration into constrained trajectory optimization frameworks,
+        once extended to explicitly condition on control inputs and enforce the full controlled dynamics.
 \end{enumerate}
 
 \subsection{Scope and Limitations}
@@ -138,18 +148,17 @@ and discussed as directions for future work.
 The research framework follows a multi-level structure. At the data generation
 level, high-fidelity numerical simulations and optimal control solvers are used
 to produce dynamically feasible ascent trajectories. At the learning level,
-these trajectories are used to train a physics-informed neural network
-surrogate that approximates state evolution over time. At the application
-level, the trained surrogate is evaluated as a candidate replacement for
-numerical integration in future optimization and guidance workflows.
+these trajectories are used to train a PINN-inspired, physics-regularized
+neural surrogate that approximates state evolution over time. At the application
+level, the trained surrogate is evaluated as a candidate approximation to
+numerical integration in future optimization and guidance workflows, rather than
+as a full replacement for a high-fidelity dynamics model.
 
 \subsection{Structure of the Thesis}
 
-The remainder of this thesis is organized as follows. Chapter~2 reviews the
-theoretical background, related work in physics-informed neural networks and
-optimal control, they are rocket dynamics model and problem
-formulation, describes the PINN architecture, training methodology,
-and surrogate evaluation then describes the methodological workflow. 
-Chapter~3 presents the results of the study. Chapter~4 discusses the findings 
-and limitations of the study. Chapter~5 concludes the
-thesis and outlines directions for future research.
+Chapter~2 presents the theoretical background, including physics-informed neural 
+networks, optimal control formulations, and the rocket dynamics model, followed 
+by a detailed description of the proposed architecture and training methodology. 
+Chapter~3 reports the numerical results. Chapter~4 discusses the implications and 
+limitations of the findings. Chapter~5 concludes the thesis and outlines directions 
+for future work.
